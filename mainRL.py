@@ -78,8 +78,9 @@ def get_embeddings(text_model, batch, device):
             }
     return tx_emb, tx_emb_uncond
 
-def train(diffusion_freeze, train_dataloader, epoch, epochs, device, infos, text_model, smplh, joints_renderer, smpl_renderer):
+def train(diffusion_freeze, diffusion_rl, train_dataloader, epoch, epochs, device, infos, text_model, smplh, joints_renderer, smpl_renderer):
     diffusion_freeze.eval()
+    diffusion_rl.train()
 
     train_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{epochs} [Train]")
     out_formats = ['videojoints','videosmpl','joints', 'txt']
@@ -91,7 +92,9 @@ def train(diffusion_freeze, train_dataloader, epoch, epochs, device, infos, text
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
             x_starts = diffusion_freeze(tx_emb, tx_emb_uncond, infos)
 
-        render(x_starts, out_formats, infos, smplh, joints_renderer, smpl_renderer, batch["text"])
+        #loss, xstart = diffusion_rl.diffusion_stepRL(batch)
+
+        #render(x_starts, out_formats, infos, smplh, joints_renderer, smpl_renderer, batch["text"])
 
 def create_folder_results(name):
     results_dir = name
@@ -127,6 +130,10 @@ def main(c: DictConfig):
     diffusion_freeze = instantiate(cfg.diffusion)
     diffusion_freeze.load_state_dict(ckpt["state_dict"])
     diffusion_freeze = diffusion_freeze.to(device)
+
+    diffusion_rl = instantiate(cfg.diffusion)
+    diffusion_rl.load_state_dict(ckpt["state_dict"])
+    diffusion_rl = diffusion_rl.to(device)
 
     train_dataset = instantiate(cfg.data, split="train")
     val_dataset = instantiate(cfg.data, split="val")
@@ -189,7 +196,7 @@ def main(c: DictConfig):
     epochs = 100
 
     for epoch in range(epochs):
-        train(diffusion_freeze, train_dataloader, epoch, epochs, device, infos, text_model,smplh, joints_renderer, smpl_renderer)
+        train(diffusion_freeze,diffusion_rl, train_dataloader, epoch, epochs, device, infos, text_model,smplh, joints_renderer, smpl_renderer)
 
 
 if __name__ == "__main__":
