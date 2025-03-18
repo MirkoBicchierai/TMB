@@ -1,0 +1,3 @@
+- trainer.max_epochs=10000
+- +split=train
+- run_dir=outputs/mdm-smpl_clip_smplrifke_humanml3d/

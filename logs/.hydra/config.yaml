@@ -1,0 +1,16 @@
+data:
+  text_encoder:
+    _target_: src.data.text.TextEmbeddings
+    dataname: ${dataset}
+    modelname: ViT-B/32
+    device: ${device}
+    preload: true
+    mean_pooling: false
+    disable: false
+    nfeats: 512
+run_dir: logs
+seed: 1234
+logger_level: INFO
+device: cuda
+text_features: ${hydra:runtime.choices.text_encoder}
+dataset: humanml3d

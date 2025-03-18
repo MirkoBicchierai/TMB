@@ -1,0 +1,7 @@
+[16/03/25 14:36:31][__main__][INFO] - Training script
+[16/03/25 14:36:31][__main__][INFO] - The config can be found here: 
+outputs/mdm-smpl_clip_smplrifke_humanml3d/config.json
+[16/03/25 14:36:31][__main__][INFO] - Loading the dataloaders
+[16/03/25 14:36:32][__main__][INFO] - Loading the model
+[16/03/25 14:36:32][__main__][INFO] - Training
+[16/03/25 14:36:33][src.callback.progress][INFO] - Training started

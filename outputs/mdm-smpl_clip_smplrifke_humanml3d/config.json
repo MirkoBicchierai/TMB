@@ -1,0 +1,113 @@
+{
+    "data": {
+        "text_encoder": {
+            "_target_": "src.data.text.TextEmbeddings",
+            "dataname": "humanml3d",
+            "modelname": "ViT-B/32",
+            "device": "cpu",
+            "preload": true,
+            "mean_pooling": false,
+            "disable": false,
+            "nfeats": 512,
+            "no_model": true
+        },
+        "motion_loader": {
+            "_target_": "src.data.motion.AMASSMotionLoader",
+            "base_dir": "datasets/motions/AMASS_20.0_fps_nh_smplrifke",
+            "fps": 20.0,
+            "nfeats": 205,
+            "disable": false
+        },
+        "_target_": "src.data.text_motion.TextMotionDataset",
+        "name": "humanml3d",
+        "split": "???",
+        "min_seconds": 2.0,
+        "max_seconds": 10.0,
+        "preload": false,
+        "tiny": false,
+        "drop_motion_perc": 0.1,
+        "drop_cond": 0.1,
+        "drop_trans": 0.5
+    },
+    "diffusion": {
+        "_target_": "src.model.gaussian.GaussianDiffusion",
+        "denoiser": {
+            "_target_": "src.model.mdm_smpl.TransformerDenoiser",
+            "nfeats": 205,
+            "tx_dim": 512,
+            "latent_dim": 512,
+            "ff_size": 2048,
+            "num_layers": 8,
+            "num_heads": 8,
+            "dropout": 0.1,
+            "activation": "gelu",
+            "nb_registers": 2
+        },
+        "schedule": {
+            "_target_": "src.model.schedule.cosine.CosineBetaSchedule",
+            "s": 0.008
+        },
+        "motion_normalizer": {
+            "_target_": "src.normalizer.Normalizer",
+            "base_dir": "pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/motion_stats",
+            "eps": 1e-12
+        },
+        "text_normalizer": {
+            "_target_": "src.normalizer.Normalizer",
+            "base_dir": "pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/text_stats",
+            "eps": 1e-12
+        },
+        "timesteps": 100,
+        "prediction": "x",
+        "lr": 0.0001
+    },
+    "trainer": {
+        "_target_": "pytorch_lightning.Trainer",
+        "max_epochs": 10000,
+        "log_every_n_steps": 1,
+        "num_sanity_val_steps": 0,
+        "check_val_every_n_epoch": 1,
+        "accelerator": "gpu",
+        "devices": 1,
+        "callbacks": [
+            {
+                "_target_": "pytorch_lightning.callbacks.ModelCheckpoint",
+                "filename": "latest-{epoch}",
+                "every_n_epochs": 1,
+                "save_top_k": 1,
+                "save_last": true
+            },
+            {
+                "_target_": "pytorch_lightning.callbacks.ModelCheckpoint",
+                "filename": "latest-{epoch}",
+                "monitor": "step",
+                "mode": "max",
+                "every_n_epochs": 500,
+                "save_top_k": -1,
+                "save_last": false
+            },
+            {
+                "_target_": "src.callback.progress.ProgressLogger",
+                "precision": 3
+            },
+            {
+                "_target_": "src.callback.tqdmbar.TQDMProgressBar"
+            }
+        ]
+    },
+    "run_dir": "outputs/mdm-smpl_clip_smplrifke_humanml3d/",
+    "seed": 1234,
+    "logger_level": "INFO",
+    "device": "cpu",
+    "resume_dir": null,
+    "ckpt": "last",
+    "motion_features": "smplrifke",
+    "text_features": "clip",
+    "dataloader": {
+        "_target_": "torch.utils.data.DataLoader",
+        "batch_size": 48,
+        "num_workers": 16
+    },
+    "dataset": "humanml3d",
+    "split": "train"
+}

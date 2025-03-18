@@ -1,0 +1,4 @@
+# Project exclude paths
+/datasets/
+/pretrained_models/
+/ResultRL/
