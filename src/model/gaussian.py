@@ -24,6 +24,7 @@ smplh = SMPLH(
     gender="male",
 )
 
+
 # Inplace operator: return the original tensor
 # work with a list of tensor as well
 def masked(tensor, mask):
@@ -45,16 +46,16 @@ class GaussianDiffusion(DiffuserBase):
     name = "gaussian"
 
     def __init__(
-        self,
-        denoiser,
-        schedule,
-        timesteps,
-        motion_normalizer,
-        text_normalizer,
-        prediction: str = "x",
-        lr: float = 2e-4,
-        weight = 1,
-        mcd = False
+            self,
+            denoiser,
+            schedule,
+            timesteps,
+            motion_normalizer,
+            text_normalizer,
+            prediction: str = "x",
+            lr: float = 2e-4,
+            weight=1,
+            mcd=False
     ):
         super().__init__(schedule, timesteps)
 
@@ -72,8 +73,6 @@ class GaussianDiffusion(DiffuserBase):
         self.weight = weight
         self.mcd = mcd
         self.original_timeline = True
-
-
 
     def load_state_dict(self, state_dict):
         super().load_state_dict(state_dict)
@@ -148,6 +147,66 @@ class GaussianDiffusion(DiffuserBase):
         loss = {"loss": xloss}
         return loss
 
+    def diffusionRL(self, tx_emb, tx_emb_uncond, infos, t=None, xt=None, A=None, progress_bar=tqdm):
+        device = self.device
+
+        lengths = infos["all_lengths"][0:tx_emb["x"].shape[0]]
+        mask = length_to_mask(lengths, device=device)
+
+        y = {
+            "length": lengths,
+            "mask": mask,
+            "tx": self.prepare_tx_emb(tx_emb),
+            "tx_uncond": self.prepare_tx_emb(tx_emb_uncond),
+            "infos": infos,
+        }
+
+        if A is None:
+
+            bs = len(lengths)
+            duration = max(lengths)
+            nfeats = self.denoiser.nfeats
+
+            shape = bs, duration, nfeats
+            xt = torch.randn(shape, device=device)
+
+            iterator = range(self.timesteps - 1, -1, -1)
+            if progress_bar is not None:
+                iterator = progress_bar(list(iterator), desc="Diffusion")
+
+            results = {}
+
+            for diffusion_step in iterator:
+                t = torch.full((bs,), diffusion_step, device=device)
+                xt_old = xt.clone()
+                xt, x_start, mean, sigma = self.p_sample_macaluso(xt, y, t)
+
+                log_likelihood = self.log_likelihood(xt, mean, sigma)
+                log_prob = log_likelihood.sum(dim=[1, 2])
+
+                # Store all relevant data for this timestep in the dictionary
+                results[diffusion_step] = {
+                    "t": diffusion_step,
+                    "xt_old": xt_old,
+                    "xt_new": xt.clone(),
+                    "log_prob": log_prob,
+                    "mean": mean.clone(),
+                    "sigma": sigma.clone()
+                }
+
+            x_start = self.motion_normalizer.inverse(x_start)
+
+            return x_start, results #xt_olds, xt_news, times, log_probs
+                                    # xt, xt_1, t, log_like
+        else:
+
+            _, _, mean, sigma = self.p_sample_macaluso(xt, y, t)
+
+            log_likelihood = self.log_likelihood(A, mean, sigma)
+            log_probs = log_likelihood.sum(dim=[1, 2])
+
+            return log_probs
+
     def diffusion_stepRL(self, batch, t=None, xt=None, A=None):
         mask = batch["mask"]
 
@@ -198,7 +257,7 @@ class GaussianDiffusion(DiffuserBase):
         else:
             log_likelihood = self.log_likelihood(A, mean, sigma)
 
-        log_probs = log_likelihood.sum(dim=[1,2])
+        log_probs = log_likelihood.sum(dim=[1, 2])
 
         return xloss, x_out, xt, t, log_probs
 
@@ -247,16 +306,16 @@ class GaussianDiffusion(DiffuserBase):
         self.log_dict(dico)
 
     # dispatch
-    def forward(self, tx_emb, tx_emb_uncond, infos, progress_bar=tqdm):    
+    def forward(self, tx_emb, tx_emb_uncond, infos, progress_bar=tqdm):
         ff = self.text_forward
         return ff(tx_emb, tx_emb_uncond, infos, progress_bar=progress_bar)
 
     def text_forward(
-        self,
-        tx_emb,
-        tx_emb_uncond,
-        infos,
-        progress_bar=tqdm,
+            self,
+            tx_emb,
+            tx_emb_uncond,
+            infos,
+            progress_bar=tqdm,
     ):
         # normalize text embeddings first
         device = self.device
@@ -318,7 +377,7 @@ class GaussianDiffusion(DiffuserBase):
         # guided forward
         output_cond = self.denoiser(xt, y, t)
 
-        #TODO guidance_weight
+        # TODO guidance_weight
         output = output_cond
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
