@@ -72,7 +72,7 @@ class TextMotionDataset(Dataset):
         self.keyids = [keyid for keyid in self.keyids if keyid in self.annotations]
         self.nfeats = self.motion_loader.nfeats
 
-        if preload:
+        if preload and False:
             for _ in tqdm(self, desc="Preloading the dataset"):
                 continue
 

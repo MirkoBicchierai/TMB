@@ -31,14 +31,6 @@ class DiffuserBase(LightningModule):
                 if not x.startswith("tmr")
             }
 
-    def sample_from_distribution_function(self, function, *args, noise=None):
-        if noise is None:
-            noise = torch.randn_like(args[0])
-
-        mean, sigma = function(*args)
-        sample = mean + sigma * noise
-        return sample
-
     # Equation 115 (page 15)
     def eps_to_xstart(self, eps, xt, t):
         xstart = (
@@ -104,6 +96,14 @@ class DiffuserBase(LightningModule):
         )
         return sample
 
+    def sample_from_distribution_function(self, function, *args, noise=None):
+        if noise is None:
+            noise = torch.randn_like(args[0])
+
+        mean, sigma = function(*args)
+        sample = mean + sigma * noise
+        return sample
+
     # Equation 84 (page 12)
     def q_posterior_distribution_from_xstart_and_xt(self, xstart, xt, t):
         """
@@ -113,7 +113,7 @@ class DiffuserBase(LightningModule):
             extract(self.posterior_mean_coef1, t, xt) * xstart
             + extract(self.posterior_mean_coef2, t, xt) * xt
         )
-        sigma = extract(self.posterior_variance, t, xt)
+        sigma = torch.clamp(extract(self.posterior_variance, t, xt), min=1e-6)
         return mean, sigma
 
     def q_posterior_sample_from_xstart_and_xt(self, xstart, xt, t, noise=None):
