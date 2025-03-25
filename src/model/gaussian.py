@@ -187,11 +187,9 @@ class GaussianDiffusion(DiffuserBase):
                 # Store all relevant data for this timestep in the dictionary
                 results[diffusion_step] = {
                     "t": diffusion_step,
-                    "xt_old": xt_old,
-                    "xt_new": xt.clone(),
-                    "log_prob": log_prob,
-                    "mean": mean.clone(),
-                    "sigma": sigma.clone()
+                    "xt_old": xt_old.detach().cpu(),
+                    "xt_new": xt.clone().detach().cpu(),
+                    "log_prob": log_prob.detach().cpu()
                 }
 
             x_start = self.motion_normalizer.inverse(x_start)

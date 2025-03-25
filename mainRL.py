@@ -12,12 +12,13 @@ from src.config import read_config
 from src.tools.extract_joints import extract_joints
 from src.model.text_encoder import TextToEmb
 import wandb
+import gc
 
 wandb.init(
     # Set the project where this run will be logged
     project="TM-BM",
     # We pass a run name (otherwise it’ll be randomly assigned, like sunshine-lollypop-10)
-    name="experiment_1",
+    name="experiment_mobile",
     # Track hyperparameters and run metadata
     config={
         "learning_rate": 1e-3,
@@ -28,11 +29,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 
-def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts):
-    out_formats = ['joints', 'txt', 'smpl', 'videojoints', 'videosmpl']  #
-    joints = []
-    smpls = []
-    smpls_data = []
+def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, iteration):
+    out_formats = ['txt', 'videojoints']  # 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl'
+
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
 
         x_start = x_start[:length]
@@ -45,18 +44,22 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts):
             smpl_layer=smplh,
         )
 
-        file_path = "ResultRL/" + str(idx) + "/"
+        file_path = "ResultRL/VAL/"
+        os.makedirs(file_path, exist_ok=True)
+
+        file_path = "ResultRL/VAL/"+str(iteration)+"/"
+        os.makedirs(file_path, exist_ok=True)
+
+        file_path = "ResultRL/VAL/" + str(iteration) + "/" + str(idx) + "/"
         os.makedirs(file_path, exist_ok=True)
 
         if "smpl" in out_formats:
             path = file_path + str(idx) + "_smpl.npy"
             np.save(path, x_start.detach().cpu())
-            smpls.append(x_start.detach().cpu())
 
         if "joints" in out_formats:
             path = file_path + str(idx) + "_joints.npy"
             np.save(path, extracted_output["joints"])
-            joints.append(extracted_output["joints"])
 
         if "vertices" in extracted_output and "vertices" in out_formats:
             path = file_path + str(idx) + "_verts.npy"
@@ -65,7 +68,6 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts):
         if "smpldata" in extracted_output and "smpldata" in out_formats:
             path = file_path + str(idx) + "_smpl.npz"
             np.savez(path, **extracted_output["smpldata"])
-            smpls_data.append(**extracted_output["smpldata"])
 
         if "videojoints" in out_formats:
             video_path = file_path + str(idx) + "_joints.mp4"
@@ -80,8 +82,6 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts):
             path = file_path + str(idx) + ".txt"
             with open(path, "w") as file:
                 file.write(f"Motion:\n- {text}")
-
-    return smpls, joints, smpls_data
 
 
 def get_embeddings(text_model, batch, device):
@@ -101,19 +101,100 @@ def get_embeddings(text_model, batch, device):
     return tx_emb, tx_emb_uncond
 
 
-def reward(sequences):
-    velocity = sequences[:, 1:, :] - sequences[:, :-1, :]
-    velocity_magnitude = torch.norm(velocity, dim=-1)  # Shape: [48, 99]
+def reward(sequences, infos, smplh, joint_weights=None, velocity_weight=1.0, variance_weight=0.5):
+    reward_scores = torch.zeros(sequences.shape[0])
+    for idx in range(sequences.shape[0]):
+        x_start = sequences[idx]
+        length = infos["all_lengths"][idx].item()
+        x_start = x_start[:length]
 
-    # Compute mean velocity per sequence (not across batch)
-    score = -torch.mean(velocity_magnitude, dim=1)  # Shape: [48]
+        extracted_output = extract_joints(
+            x_start.detach().cpu(),
+            infos["featsname"],
+            fps=infos["fps"],
+            value_from="smpl",
+            smpl_layer=smplh,
+        )
 
-    return score
+        joints = torch.from_numpy(extracted_output["joints"]).float()  # [length, num_joints, 3]
+
+        # Optional joint weighting
+        if joint_weights is None:
+            joint_weights = torch.ones(joints.shape[1])
+
+        # Calculate velocities
+        joints_velocity = joints[1:] - joints[:-1]  # [length-1, num_joints, 3]
+        velocity_magnitude = torch.norm(joints_velocity, dim=-1)  # [length-1, num_joints]
+
+        # Apply joint weights to velocities
+        weighted_velocity = velocity_magnitude * joint_weights
+        mean_velocity = weighted_velocity.mean()
+
+        # Calculate weighted joint variance
+        joint_variance = torch.var(joints, dim=0)  # [num_joints, 3]
+        weighted_variance = (joint_variance.sum(dim=1) * joint_weights).sum()
+
+        # Compute stillness score (higher means more still)
+        stillness_score = -(velocity_weight * mean_velocity + variance_weight * weighted_variance)
+
+        # Normalize to a more interpretable range (optional)
+        # stillness_score = torch.sigmoid(stillness_score)  # Maps to [0,1]
+
+        reward_scores[idx] = stillness_score
+
+    print(reward_scores)
+
+    return reward_scores
+
+
+def reward2(sequences, infos, smplh, joint_weights=None, velocity_weight=1.0, variance_weight=0.5, threshold=15.0):
+    reward_scores = torch.zeros(sequences.shape[0])
+    for idx in range(sequences.shape[0]):
+        x_start = sequences[idx]
+        length = infos["all_lengths"][idx].item()
+        x_start = x_start[:length]
+        extracted_output = extract_joints(
+            x_start.detach().cpu(),
+            infos["featsname"],
+            fps=infos["fps"],
+            value_from="smpl",
+            smpl_layer=smplh,
+        )
+        joints = torch.from_numpy(extracted_output["joints"]).float()  # [length, num_joints, 3]
+
+        # Optional joint weighting
+        if joint_weights is None:
+            joint_weights = torch.ones(joints.shape[1])
+
+        # Calculate velocities
+        joints_velocity = joints[1:] - joints[:-1]  # [length-1, num_joints, 3]
+        velocity_magnitude = torch.norm(joints_velocity, dim=-1)  # [length-1, num_joints]
+
+        # Apply joint weights to velocities
+        weighted_velocity = velocity_magnitude * joint_weights
+        mean_velocity = weighted_velocity.mean()
+
+        # Calculate weighted joint variance
+        joint_variance = torch.var(joints, dim=0)  # [num_joints, 3]
+        weighted_variance = (joint_variance.sum(dim=1) * joint_weights).sum()
+
+        # Compute raw stillness score
+        raw_score = -(velocity_weight * mean_velocity + variance_weight * weighted_variance)
+
+        # Normalize to [0,1] where 1 means completely still
+        # Using exponential normalization instead of sigmoid for better control
+        normalized_score = torch.exp(raw_score / threshold)
+        normalized_score = torch.clamp(normalized_score, 0, 1)
+
+        reward_scores[idx] = normalized_score
+
+    print(reward_scores)
+    return reward_scores
 
 
 def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer, smpl_renderer, num_examples):
     model.eval()
-    train_bar = tqdm(train_dataloader, desc=f"Iteration {iteration + 1}/{iterations} [Generate new dataset]")
+    generate_bar = tqdm(train_dataloader, desc=f"Iteration {iteration + 1}/{iterations} [Generate new dataset]")
 
     dataset = {
         "r": [],
@@ -130,14 +211,14 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
         "tx_emb_uncond_length": [],
     }
 
-    for batch_idx, batch in enumerate(train_bar):
+    for batch_idx, batch in enumerate(generate_bar):
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
             sequences, results_by_timestep = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
-            # smpls, joints, smpls_data = render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"])
-            r = reward(sequences)
+            #smpls, joints, smpls_data = render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"])
+            r = reward2(sequences, infos, smplh)
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         batch_size = r.shape[0]
@@ -183,7 +264,7 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
             all_log_probs.append(experiment["log_prob"])
 
         # Concatenate all the results for this batch
-        dataset["r"].append(torch.cat(all_rewards, dim=0))
+        dataset["r"].append(torch.cat(all_rewards, dim=0).clone())
         dataset["xt_1"].append(torch.cat(all_xt_new, dim=0))
         dataset["xt"].append(torch.cat(all_xt_old, dim=0))
         dataset["t"].append(torch.cat(all_t, dim=0))
@@ -198,7 +279,7 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
     return dataset
 
 
-def get_batch(dataset, i, minibatch_size):
+def get_batch(dataset, i, minibatch_size, device):
 
     tx_emb_x = dataset["tx_emb_x"][i: i + minibatch_size]
     tx_emb_mask = dataset["tx_emb_mask"][i: i + minibatch_size]
@@ -208,15 +289,15 @@ def get_batch(dataset, i, minibatch_size):
     tx_emb_uncond_length = dataset["tx_emb_uncond_length"][i: i + minibatch_size]
 
     tx_emb= {
-        "x": tx_emb_x,
-        "mask": tx_emb_mask,
-        "length": tx_emb_length
+        "x": tx_emb_x.to(device),
+        "mask": tx_emb_mask.to(device),
+        "length": tx_emb_length.to(device)
     }
 
     tx_emb_uncond= {
-        "x": tx_emb_uncond_x,
-        "mask": tx_emb_uncond_mask,
-        "length": tx_emb_uncond_length
+        "x": tx_emb_uncond_x.to(device),
+        "mask": tx_emb_uncond_mask.to(device),
+        "length": tx_emb_uncond_length.to(device)
     }
 
     return tx_emb, tx_emb_uncond
@@ -248,14 +329,14 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
 
-            r = dataset["r"][batch_idx: batch_idx + batch_size]
-            xt_1 = dataset["xt_1"][batch_idx: batch_idx + batch_size]
-            xt = dataset["xt"][batch_idx: batch_idx + batch_size]
-            t = dataset["t"][batch_idx: batch_idx + batch_size]
-            log_like = dataset["log_like"][batch_idx: batch_idx + batch_size]
+            r = dataset["r"][batch_idx: batch_idx + batch_size].to(device)
+            xt_1 = dataset["xt_1"][batch_idx: batch_idx + batch_size].to(device)
+            xt = dataset["xt"][batch_idx: batch_idx + batch_size].to(device)
+            t = dataset["t"][batch_idx: batch_idx + batch_size].to(device)
+            log_like = dataset["log_like"][batch_idx: batch_idx + batch_size].to(device)
             advantage = dataset["advantage"][batch_idx: batch_idx + batch_size].to(device)
 
-            tx_emb, tx_emb_uncond = get_batch(dataset, batch_idx, batch_size)
+            tx_emb, tx_emb_uncond = get_batch(dataset, batch_idx, batch_size, device)
 
             new_log_like = model.diffusionRL(tx_emb, tx_emb_uncond, infos, t=t, xt=xt, A=xt_1)
 
@@ -289,6 +370,18 @@ def create_folder_results(name):
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
 
+def test(model, dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer, smpl_renderer):
+    model.eval()
+    generate_bar = tqdm(dataloader, desc=f"Iteration {iteration + 1}/{iterations} [Validation]")
+
+    for batch in generate_bar:
+        batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        with torch.no_grad():
+            tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
+            render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], iteration)
+
+        break
 
 @hydra.main(config_path="configs", config_name="TrainRL", version_base="1.3")
 def main(c: DictConfig):
@@ -314,11 +407,14 @@ def main(c: DictConfig):
     diffusion_rl = diffusion_rl.to(device)
 
     train_dataset = instantiate(cfg.data, split="train")
+    val_dataset = instantiate(cfg.data, split="val")
+
+    iterations = 10
 
     num_examples = 2
-    batch_size = 32
+    batch_size = 64
 
-    train_batch_size = 16
+    train_batch_size = 32
     train_epochs = 3
 
     fps = 20
@@ -341,6 +437,16 @@ def main(c: DictConfig):
         collate_fn=train_dataset.collate_fn
     )
 
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=False,
+        pin_memory=True,
+        num_workers=12,
+        collate_fn=val_dataset.collate_fn
+    )
+
     text_model = TextToEmb(
         modelpath=cfg.data.text_encoder.modelname, mean_pooling=cfg.data.text_encoder.mean_pooling, device=device
     )
@@ -355,13 +461,14 @@ def main(c: DictConfig):
     )
 
     lr = 2e-6
-    #optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
-    optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
 
-    iterations = 100
     for iteration in range(iterations):
+        test(diffusion_rl, val_dataloader, iteration,iterations, device,infos, text_model, smplh, joints_renderer, smpl_renderer)
+        gc.collect()
         train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, iterations, device, infos, text_model,
                                      smplh, joints_renderer, smpl_renderer, num_examples)
+        gc.collect()
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, iterations, infos, device, train_batch_size, train_epochs)
 
 
