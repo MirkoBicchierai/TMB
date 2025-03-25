@@ -177,6 +177,7 @@ class GaussianDiffusion(DiffuserBase):
             results = {}
 
             for diffusion_step in iterator:
+
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
                 xt, x_start, mean, sigma = self.p_sample_macaluso(xt, y, t)
@@ -194,12 +195,11 @@ class GaussianDiffusion(DiffuserBase):
 
             x_start = self.motion_normalizer.inverse(x_start)
 
-            return x_start, results #xt_olds, xt_news, times, log_probs
-                                    # xt, xt_1, t, log_like
+            return x_start, results
+
         else:
 
             _, _, mean, sigma = self.p_sample_macaluso(xt, y, t)
-
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.sum(dim=[1, 2])
 

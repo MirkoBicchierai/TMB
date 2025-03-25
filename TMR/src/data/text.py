@@ -17,13 +17,22 @@ class TextEmbeddings(ABC):
     def __init__(
         self,
         modelname: str,
+        modelpath: str = None,
         path: str = "",
         device: str = "cpu",
         preload: bool = True,
         disable: bool = False,
+        name: str = None # TODO check if needed keep this change compared to TMR
     ):
+        if name is not None:
+            self.name = name
+
         self.modelname = modelname
+        self.modelpath = modelpath
+        if modelpath is None:
+            self.modelpath = modelname
         self.embeddings_folder = os.path.join(path, self.name)
+
         self.cache = {}
         self.device = device
         self.disable = disable
@@ -88,7 +97,7 @@ class TokenEmbeddings(TextEmbeddings):
     name = "token_embeddings"
 
     def load_model(self):
-        self.model = TextToEmb(self.modelname, mean_pooling=False, device=self.device)
+        self.model = TextToEmb(self.modelpath, mean_pooling=False, device=self.device)
         return self.model
 
     def load_embeddings(self):
@@ -116,7 +125,7 @@ class SentenceEmbeddings(TextEmbeddings):
     name = "sent_embeddings"
 
     def load_model(self):
-        self.model = TextToEmb(self.modelname, mean_pooling=True, device=self.device)
+        self.model = TextToEmb(self.modelpath, mean_pooling=True, device=self.device)
         return self.model
 
     def load_embeddings(self):
@@ -152,12 +161,19 @@ def write_json(data, path):
 
 
 def save_token_embeddings(
-    path, modelname="sentence-transformers/all-mpnet-base-v2", device="cuda"
+    path, annotations_filename="annotations.json", output_folder_name=None,
+    modelname="sentence-transformers/all-mpnet-base-v2", modelpath=None, device="cuda"
 ):
-    model = TextToEmb(modelname, device=device)
-    annotations = load_annotations(path)
+    if modelpath is None:
+        modelpath = modelname
+    model = TextToEmb(modelpath, device=device)
 
-    path = os.path.join(path, TokenEmbeddings.name)
+    annotations = load_annotations(path, name=annotations_filename)
+
+    if output_folder_name is None:
+        output_folder_name = TokenEmbeddings.name
+    path = os.path.join(path, output_folder_name)
+
     ptpath = os.path.join(path, f"{modelname}.npy")
     slicepath = os.path.join(path, f"{modelname}_slice.npy")
     jsonpath = os.path.join(path, f"{modelname}_index.json")
@@ -177,7 +193,7 @@ def save_token_embeddings(
 
     # batch of N/10
     nb_tokens = []
-    all_texts_batched = np.array_split(all_texts, 100)
+    all_texts_batched = np.array_split(all_texts, min(len(all_texts), 100))
 
     nb_tokens_so_far = 0
     big_tensor = []
@@ -219,12 +235,19 @@ def save_token_embeddings(
 
 
 def save_sent_embeddings(
-    path, modelname="sentence-transformers/all-mpnet-base-v2", device="cuda"
+    path, annotations_filename="annotations.json", output_folder_name=None,
+    modelname="sentence-transformers/all-mpnet-base-v2", modelpath=None, device="cuda"
 ):
-    model = TextToEmb(modelname, mean_pooling=True, device=device)
-    annotations = load_annotations(path)
+    # Provide modelpath as a path to the local folder of the model if you can't access internet during training
+    if modelpath is None:
+        modelpath = modelname
+    model = TextToEmb(modelpath, mean_pooling=True, device=device)
+    annotations = load_annotations(path, name=annotations_filename)
 
-    path = os.path.join(path, SentenceEmbeddings.name)
+    if output_folder_name is None:
+        output_folder_name = SentenceEmbeddings.name
+    path = os.path.join(path, output_folder_name)
+
     ptpath = os.path.join(path, f"{modelname}.npy")
     jsonpath = os.path.join(path, f"{modelname}_index.json")
 
@@ -242,7 +265,7 @@ def save_sent_embeddings(
     all_texts = list(set(all_texts))
 
     # batch of N/10
-    all_texts_batched = np.array_split(all_texts, 100)
+    all_texts_batched = np.array_split(all_texts, min(len(all_texts), 100))
     embeddings = []
     for all_texts_batch in tqdm(all_texts_batched):
         embedding = model(list(all_texts_batch)).cpu()
