@@ -180,7 +180,7 @@ class GaussianDiffusion(DiffuserBase):
 
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
-                xt, x_start, mean, sigma = self.p_sample_macaluso(xt, y, t)
+                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t)
 
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_prob = log_likelihood.sum(dim=[1, 2])
@@ -199,7 +199,7 @@ class GaussianDiffusion(DiffuserBase):
 
         else:
 
-            _, _, mean, sigma = self.p_sample_macaluso(xt, y, t)
+            _, _, mean, sigma = self.p_sample_2(xt, y, t)
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.sum(dim=[1, 2])
 
@@ -371,7 +371,7 @@ class GaussianDiffusion(DiffuserBase):
         xstart = output
         return x_out, xstart
 
-    def p_sample_macaluso(self, xt, y, t):
+    def p_sample_2(self, xt, y, t):
         # guided forward
         output_cond = self.denoiser(xt, y, t)
 

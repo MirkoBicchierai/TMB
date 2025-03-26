@@ -21,11 +21,8 @@ from TMR.src.model.tmr import get_sim_matrix
 tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
 
 wandb.init(
-    # Set the project where this run will be logged
     project="TM-BM",
-    # We pass a run name (otherwise it’ll be randomly assigned, like sunshine-lollypop-10)
     name="experiment_mobile",
-    # Track hyperparameters and run metadata
     config={
         "learning_rate": 1e-3,
         "epochs": 4,
@@ -100,6 +97,7 @@ def get_embeddings(text_model, batch, device):
             }
     return tx_emb, tx_emb_uncond
 
+
 def smpl_to_guofeats(smpl, smplh):
     guofeats = []
     for i in smpl:
@@ -123,6 +121,7 @@ def smpl_to_guofeats(smpl, smplh):
 
     return guofeats
 
+
 def calc_eval_stats(X, Y, smplh):
     """
         Calculate Motion2Motion (m2m) and the Motion2Text (m2t) between the recostructed motion, the gt motion and the gt text.
@@ -141,8 +140,10 @@ def calc_eval_stats(X, Y, smplh):
     sim_matrix = get_sim_matrix(X_latents, Y_latents).numpy()
     return sim_matrix
 
+
 def is_list_of_strings(var):
     return isinstance(var, list) and all(isinstance(item, str) for item in var)
+
 
 def reward_tmr(sequences, infos, smplh, texts):
     reward_scores = torch.zeros(sequences.shape[0])
@@ -162,42 +163,9 @@ def reward_tmr(sequences, infos, smplh, texts):
 
     return reward_scores
 
-def reward(sequences, infos, smplh, joint_weights=None, velocity_weight=1.0, variance_weight=0.5):
-    reward_scores = torch.zeros(sequences.shape[0])
-    for idx in range(sequences.shape[0]):
-        x_start = sequences[idx]
-        length = infos["all_lengths"][idx].item()
-        x_start = x_start[:length]
-        extracted_output = extract_joints(
-            x_start.detach().cpu(),
-            infos["featsname"],
-            fps=infos["fps"],
-            value_from="smpl",
-            smpl_layer=smplh,
-        )
-        joints = torch.from_numpy(extracted_output["joints"]).float()  # [length, num_joints, 3]
 
-        if joint_weights is None:
-            joint_weights = torch.ones(joints.shape[1])
-
-        joints_velocity = joints[1:] - joints[:-1]
-        velocity_magnitude = torch.norm(joints_velocity, dim=-1)
-
-        # Apply joint weights to velocities
-        weighted_velocity = velocity_magnitude * joint_weights
-        mean_velocity = weighted_velocity.mean()
-
-        joint_variance = torch.var(joints, dim=0)
-        weighted_variance = (joint_variance.sum(dim=1) * joint_weights).sum()
-
-        raw_score = 1 / (1 + velocity_weight * mean_velocity + variance_weight * weighted_variance)
-        reward_scores[idx] = raw_score
-
-    print(reward_scores)
-    return reward_scores
-
-
-def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer, smpl_renderer, num_examples):
+def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer,
+             smpl_renderer, num_examples):
     model.eval()
     generate_bar = tqdm(train_dataloader, desc=f"Iteration {iteration + 1}/{iterations} [Generate new dataset]")
 
@@ -208,9 +176,9 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
         "t": [],
         "log_like": [],
 
-        "tx_emb_x":[],
+        "tx_emb_x": [],
         "tx_emb_mask": [],
-        "tx_emb_length":[],
+        "tx_emb_length": [],
         "tx_emb_uncond_x": [],
         "tx_emb_uncond_mask": [],
         "tx_emb_uncond_length": [],
@@ -284,7 +252,6 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
 
 
 def get_batch(dataset, i, minibatch_size, device):
-
     tx_emb_x = dataset["tx_emb_x"][i: i + minibatch_size]
     tx_emb_mask = dataset["tx_emb_mask"][i: i + minibatch_size]
     tx_emb_length = dataset["tx_emb_length"][i: i + minibatch_size]
@@ -292,13 +259,13 @@ def get_batch(dataset, i, minibatch_size, device):
     tx_emb_uncond_mask = dataset["tx_emb_uncond_mask"][i: i + minibatch_size]
     tx_emb_uncond_length = dataset["tx_emb_uncond_length"][i: i + minibatch_size]
 
-    tx_emb= {
+    tx_emb = {
         "x": tx_emb_x.to(device),
         "mask": tx_emb_mask.to(device),
         "length": tx_emb_length.to(device)
     }
 
-    tx_emb_uncond= {
+    tx_emb_uncond = {
         "x": tx_emb_uncond_x.to(device),
         "mask": tx_emb_uncond_mask.to(device),
         "length": tx_emb_uncond_length.to(device)
@@ -360,7 +327,7 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
 
         epoch_loss = tot_loss / num_minibatches
         train_bar.set_postfix(avg_advantage=f"{epoch_loss:.4f}")
-        wandb.log({"loss": epoch_loss})
+        wandb.log({"Train": {"loss": epoch_loss}})
 
 
 def create_folder_results(name):
@@ -374,9 +341,13 @@ def create_folder_results(name):
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
 
+
 def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, path):
     model.eval()
     generate_bar = tqdm(dataloader, desc=f"[Validation/Test Generations]")
+
+    total_reward = 0
+    batch_count = 0
 
     for batch in generate_bar:
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
@@ -384,8 +355,15 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
             render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], path)
+            r = reward_tmr(sequences, infos, smplh, batch["text"])  # shape [batch_size]
+            total_reward += r.sum().item()
+            batch_count += r.shape[0]
 
         break
+
+    avg_reward = total_reward / batch_count
+    return avg_reward
+
 
 @hydra.main(config_path="configs", config_name="TrainRL", version_base="1.3")
 def main(c: DictConfig):
@@ -414,10 +392,11 @@ def main(c: DictConfig):
     val_dataset = instantiate(cfg.data, split="val")
     test_dataset = instantiate(cfg.data, split="val")
 
-    iterations = 10
+    iterations = 2
 
-    num_examples = 2
-    batch_size = 64
+    num_examples = 1
+    batch_size = 32
+    val_batch_size = 8
 
     train_batch_size = 32
     train_epochs = 3
@@ -444,7 +423,7 @@ def main(c: DictConfig):
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=batch_size,
+        batch_size=val_batch_size,
         shuffle=False,
         drop_last=False,
         pin_memory=True,
@@ -454,7 +433,7 @@ def main(c: DictConfig):
 
     test_dataloader = DataLoader(
         test_dataset,
-        batch_size=batch_size,
+        batch_size=val_batch_size,
         shuffle=False,
         drop_last=False,
         pin_memory=True,
@@ -482,11 +461,13 @@ def main(c: DictConfig):
     os.makedirs(file_path, exist_ok=True)
     file_path = "ResultRL/VAL/OLD/"
     os.makedirs(file_path, exist_ok=True)
-    #test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, file_path)
+    avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,
+                      file_path)
+    wandb.log({"Validation": {"Reward": avg_reward}})
+    print("Avg Reward OLD model:", avg_reward)
     gc.collect()
 
     for iteration in range(iterations):
-
         train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer, smpl_renderer, num_examples)
         gc.collect()
 
@@ -494,13 +475,18 @@ def main(c: DictConfig):
 
         file_path = "ResultRL/VAL/" + str(iteration) + "/"
         os.makedirs(file_path, exist_ok=True)
-        test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, file_path)
+        avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, file_path)
+        wandb.log({"Validation": {"Reward": avg_reward}})
+        print("Avg Reward:", avg_reward, " at iteration:", iteration)
         gc.collect()
 
     file_path = "ResultRL/TEST/"
     os.makedirs(file_path, exist_ok=True)
-    test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, file_path)
+    avg_reward = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, file_path)
+    wandb.log({"Test": {"Reward": avg_reward}})
+    print("Avg Reward Test Set:", avg_reward)
     gc.collect()
+
 
 if __name__ == "__main__":
     main()
