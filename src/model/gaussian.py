@@ -147,7 +147,7 @@ class GaussianDiffusion(DiffuserBase):
         loss = {"loss": xloss}
         return loss
 
-    def diffusionRL(self, tx_emb, tx_emb_uncond, infos, t=None, xt=None, A=None, progress_bar=tqdm):
+    def diffusionRL(self, tx_emb, tx_emb_uncond, infos, guidance_weight=1.0, t=None, xt=None, A=None, progress_bar=tqdm):
         device = self.device
 
         lengths = infos["all_lengths"][0:tx_emb["x"].shape[0]]
@@ -180,17 +180,22 @@ class GaussianDiffusion(DiffuserBase):
 
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
-                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t)
 
+                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_prob = log_likelihood.sum(dim=[1, 2])
 
                 # Store all relevant data for this timestep in the dictionary
+                if diffusion_step == 0:
+                    sus = "ultimo"
+                else:
+                    sus = "no"
                 results[diffusion_step] = {
                     "t": diffusion_step,
                     "xt_old": xt_old.detach().cpu(),
                     "xt_new": xt.clone().detach().cpu(),
-                    "log_prob": log_prob.detach().cpu()
+                    "log_prob": log_prob.detach().cpu(),
+                    "test":sus
                 }
 
             x_start = self.motion_normalizer.inverse(x_start)
@@ -199,7 +204,7 @@ class GaussianDiffusion(DiffuserBase):
 
         else:
 
-            _, _, mean, sigma = self.p_sample_2(xt, y, t)
+            _, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.sum(dim=[1, 2])
 
@@ -337,7 +342,7 @@ class GaussianDiffusion(DiffuserBase):
         shape = bs, duration, nfeats
         xt = torch.randn(shape, device=device)
 
-        iterator = range(self.timesteps - 1, -1, -1)
+        iterator = range(self.timesteps - 1, -1, -1) #range(self.timesteps - 1, -2, -1)
         if progress_bar is not None:
             iterator = progress_bar(list(iterator), desc="Diffusion")
 
@@ -371,12 +376,19 @@ class GaussianDiffusion(DiffuserBase):
         xstart = output
         return x_out, xstart
 
-    def p_sample_2(self, xt, y, t):
+    def p_sample_2(self, xt, y, t, guidance_weight):
         # guided forward
         output_cond = self.denoiser(xt, y, t)
 
-        # TODO guidance_weight
-        output = output_cond
+        if guidance_weight == 1.0:
+            output = output_cond
+        else:
+            y_uncond = y.copy()  # not a deep copy
+            y_uncond["tx"] = y_uncond["tx_uncond"]
+
+            output_uncond = self.denoiser(xt, y_uncond, t)
+            # classifier-free guidance
+            output = output_uncond + guidance_weight * (output_cond - output_uncond)
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
 

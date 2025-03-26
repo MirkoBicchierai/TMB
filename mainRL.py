@@ -159,8 +159,6 @@ def reward_tmr(sequences, infos, smplh, texts):
         sim_matrix = calc_eval_stats(motion, text, smplh)
         reward_scores[idx] = torch.tensor(sim_matrix[0][0])
 
-    print(reward_scores)
-
     return reward_scores
 
 
@@ -187,63 +185,63 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
     for batch_idx, batch in enumerate(generate_bar):
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
-        with torch.no_grad():
-            tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            sequences, results_by_timestep = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
-            r = reward_tmr(sequences, infos, smplh, batch["text"])
+        for i in range(num_examples):
+            with torch.no_grad():
+                tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
+                sequences, results_by_timestep = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=7.0)
+                r = reward_tmr(sequences, infos, smplh, batch["text"])
 
-        timesteps = sorted(results_by_timestep.keys(), reverse=True)
-        batch_size = r.shape[0]
+            timesteps = sorted(results_by_timestep.keys())
+            batch_size = r.shape[0]
 
-        # Calculate how many times we need to repeat the embeddings (once per timestep)
-        num_timesteps = len(timesteps)
+            # Calculate how many times we need to repeat the embeddings (once per timestep)
+            num_timesteps = len(timesteps)
 
-        # Store text embeddings just once, with repeat handling during concatenation
-        tx_emb_x_repeated = tx_emb["x"].repeat(num_timesteps, 1, 1)
-        tx_emb_mask_repeated = tx_emb["mask"].repeat(num_timesteps, 1)
-        tx_emb_length_repeated = tx_emb["length"].repeat(num_timesteps)
+            # Store text embeddings just once, with repeat handling during concatenation
+            tx_emb_x_repeated = tx_emb["x"].repeat(num_timesteps, 1, 1)
+            tx_emb_mask_repeated = tx_emb["mask"].repeat(num_timesteps, 1)
+            tx_emb_length_repeated = tx_emb["length"].repeat(num_timesteps)
 
-        tx_emb_uncond_x_repeated = tx_emb_uncond["x"].repeat(num_timesteps, 1, 1)
-        tx_emb_uncond_mask_repeated = tx_emb_uncond["mask"].repeat(num_timesteps, 1)
-        tx_emb_uncond_length_repeated = tx_emb_uncond["length"].repeat(num_timesteps)
+            tx_emb_uncond_x_repeated = tx_emb_uncond["x"].repeat(num_timesteps, 1, 1)
+            tx_emb_uncond_mask_repeated = tx_emb_uncond["mask"].repeat(num_timesteps, 1)
+            tx_emb_uncond_length_repeated = tx_emb_uncond["length"].repeat(num_timesteps)
 
-        dataset["tx_emb_x"].append(tx_emb_x_repeated)
-        dataset["tx_emb_mask"].append(tx_emb_mask_repeated)
-        dataset["tx_emb_length"].append(tx_emb_length_repeated)
+            dataset["tx_emb_x"].append(tx_emb_x_repeated)
+            dataset["tx_emb_mask"].append(tx_emb_mask_repeated)
+            dataset["tx_emb_length"].append(tx_emb_length_repeated)
 
-        dataset["tx_emb_uncond_x"].append(tx_emb_uncond_x_repeated)
-        dataset["tx_emb_uncond_mask"].append(tx_emb_uncond_mask_repeated)
-        dataset["tx_emb_uncond_length"].append(tx_emb_uncond_length_repeated)
+            dataset["tx_emb_uncond_x"].append(tx_emb_uncond_x_repeated)
+            dataset["tx_emb_uncond_mask"].append(tx_emb_uncond_mask_repeated)
+            dataset["tx_emb_uncond_length"].append(tx_emb_uncond_length_repeated)
 
-        # Process all timesteps and their corresponding outputs
-        all_rewards = []
-        all_xt_new = []
-        all_xt_old = []
-        all_t = []
-        all_log_probs = []
+            # Process all timesteps and their corresponding outputs
+            all_rewards = []
+            all_xt_new = []
+            all_xt_old = []
+            all_t = []
+            all_log_probs = []
 
-        for i, t in enumerate(timesteps):
-            experiment = results_by_timestep[t]
+            for t in timesteps:
+                experiment = results_by_timestep[t]
 
-            if i == 0:
-                all_rewards.append(r)
-            else:
-                all_rewards.append(torch.zeros_like(r))
+                if t == 0:
+                    all_rewards.append(r)
+                else:
+                    all_rewards.append(torch.zeros_like(r))
 
-            all_xt_new.append(experiment["xt_new"])
-            all_xt_old.append(experiment["xt_old"])
-            all_t.append(torch.full((batch_size,), t, device=r.device))
-            all_log_probs.append(experiment["log_prob"])
+                all_xt_new.append(experiment["xt_new"])
+                all_xt_old.append(experiment["xt_old"])
+                all_t.append(torch.full((batch_size,), t, device=r.device))
+                all_log_probs.append(experiment["log_prob"])
 
-        # Concatenate all the results for this batch
-        dataset["r"].append(torch.cat(all_rewards, dim=0).clone())
-        dataset["xt_1"].append(torch.cat(all_xt_new, dim=0))
-        dataset["xt"].append(torch.cat(all_xt_old, dim=0))
-        dataset["t"].append(torch.cat(all_t, dim=0))
-        dataset["log_like"].append(torch.cat(all_log_probs, dim=0))
+            # Concatenate all the results for this batch
+            dataset["r"].append(torch.cat(all_rewards, dim=0).clone())
+            dataset["xt_1"].append(torch.cat(all_xt_new, dim=0))
+            dataset["xt"].append(torch.cat(all_xt_old, dim=0))
+            dataset["t"].append(torch.cat(all_t, dim=0))
+            dataset["log_like"].append(torch.cat(all_log_probs, dim=0))
 
-        if (batch_idx + 1) % num_examples == 0:
-            break
+        break
 
     for key in dataset:
         dataset[key] = torch.cat(dataset[key], dim=0)
@@ -300,7 +298,7 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
 
-            r = dataset["r"][batch_idx: batch_idx + batch_size].to(device)
+            #r = dataset["r"][batch_idx: batch_idx + batch_size].to(device)
             xt_1 = dataset["xt_1"][batch_idx: batch_idx + batch_size].to(device)
             xt = dataset["xt"][batch_idx: batch_idx + batch_size].to(device)
             t = dataset["t"][batch_idx: batch_idx + batch_size].to(device)
@@ -309,21 +307,26 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
 
             tx_emb, tx_emb_uncond = get_batch(dataset, batch_idx, batch_size, device)
 
-            new_log_like = model.diffusionRL(tx_emb, tx_emb_uncond, infos, t=t, xt=xt, A=xt_1)
+            new_log_like = model.diffusionRL(tx_emb, tx_emb_uncond, infos, t=t, xt=xt, A=xt_1, guidance_weight=7.0)
 
             ratio = torch.exp(new_log_like - log_like)
 
-            adv_per_ratio = -advantage * ratio
+            #adv_per_ratio = -advantage * ratio
 
             epsilon = 0.2
-            clipped_adv_per_ratio = -torch.clamp(ratio, 1 - epsilon, 1 + epsilon) * advantage
-            final_advantage = torch.max(adv_per_ratio, clipped_adv_per_ratio).mean()
+            #clipped_adv_per_ratio = -torch.clamp(ratio, 1 - epsilon, 1 + epsilon) * advantage
+            #final_advantage = torch.max(adv_per_ratio, clipped_adv_per_ratio).mean()
 
-            tot_loss += final_advantage.item()
+            clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
+            policy_loss = -torch.min(ratio * advantage, clip_adv).mean()
 
-            final_advantage.backward()
+            tot_loss += policy_loss.item()
+
+            policy_loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+
             optimizer.step()
-            minibatch_bar.set_postfix(advantage=f"{final_advantage.item():.4f}")
+            minibatch_bar.set_postfix(advantage=f"{policy_loss.item():.4f}")
 
         epoch_loss = tot_loss / num_minibatches
         train_bar.set_postfix(avg_advantage=f"{epoch_loss:.4f}")
@@ -353,7 +356,7 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=7.0)
             render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], path)
             r = reward_tmr(sequences, infos, smplh, batch["text"])  # shape [batch_size]
             total_reward += r.sum().item()
@@ -392,20 +395,21 @@ def main(c: DictConfig):
     val_dataset = instantiate(cfg.data, split="val")
     test_dataset = instantiate(cfg.data, split="val")
 
-    iterations = 2
+    iterations = 10000
 
-    num_examples = 1
-    batch_size = 32
-    val_batch_size = 8
+    num_examples = 16
+    batch_size = 128
 
-    train_batch_size = 32
-    train_epochs = 3
+    val_batch_size = 16
+
+    train_batch_size = 256
+    train_epochs = 5
 
     fps = 20
     time = 5
 
     infos = {
-        "all_lengths": torch.tensor(np.full(batch_size, time * fps)).to(device),
+        "all_lengths": torch.tensor(np.full(2048, time * fps)).to(device),
         "featsname": cfg.motion_features,
         "fps": fps,
         "guidance_weight": c.guidance
@@ -468,6 +472,7 @@ def main(c: DictConfig):
     gc.collect()
 
     for iteration in range(iterations):
+
         train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, iterations, device, infos, text_model, smplh, joints_renderer, smpl_renderer, num_examples)
         gc.collect()
 
@@ -486,6 +491,8 @@ def main(c: DictConfig):
     wandb.log({"Test": {"Reward": avg_reward}})
     print("Avg Reward Test Set:", avg_reward)
     gc.collect()
+
+    torch.save(diffusion_rl.state_dict(), 'RL_Model/model_state.pth')
 
 
 if __name__ == "__main__":
