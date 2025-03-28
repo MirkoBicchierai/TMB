@@ -171,13 +171,12 @@ class GaussianDiffusion(DiffuserBase):
             xt = torch.randn(shape, device=device)
 
             iterator = range(self.timesteps - 1, -1, -1)
-            if progress_bar is not None:
-                iterator = progress_bar(list(iterator), desc="Diffusion")
+            #if progress_bar is not None:
+            #    iterator = progress_bar(list(iterator), desc="Diffusion")
 
             results = {}
 
             for diffusion_step in iterator:
-
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
 
@@ -185,17 +184,11 @@ class GaussianDiffusion(DiffuserBase):
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_prob = log_likelihood.sum(dim=[1, 2])
 
-                # Store all relevant data for this timestep in the dictionary
-                if diffusion_step == 0:
-                    sus = "ultimo"
-                else:
-                    sus = "no"
                 results[diffusion_step] = {
-                    "t": diffusion_step,
-                    "xt_old": xt_old.detach().cpu(),
-                    "xt_new": xt.clone().detach().cpu(),
-                    "log_prob": log_prob.detach().cpu(),
-                    "test":sus
+                    "t": diffusion_step,  # begin the t
+                    "xt_old": xt_old.detach().cpu(),  # begin the xt
+                    "xt_new": xt.clone().detach().cpu(),  # begin the A when train PPO
+                    "log_prob": log_prob.detach().cpu()
                 }
 
             x_start = self.motion_normalizer.inverse(x_start)
