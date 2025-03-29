@@ -11,7 +11,7 @@ from src.config import read_config
 from src.tools.extract_joints import extract_joints
 from src.model.text_encoder import TextToEmb
 import wandb
-
+import gc
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
@@ -31,7 +31,6 @@ def get_embeddings(text_model, batch, device):
                 "length": torch.tensor([1 for _ in range(len(tx_emb_uncond))]).to(device),
             }
     return tx_emb, tx_emb_uncond
-
 
 
 def stillness_reward(sequences, infos, smplh, texts, regularization_weight=1, epsilon=1e-6):
@@ -105,7 +104,9 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
             r = stillness_reward(sequences, infos, smplh, batch["text"])
 
             timesteps = sorted(results_by_timestep.keys(), reverse=True)
+            diff_step = len(timesteps)
             batch_size = r.shape[0]
+            seq_len = results_by_timestep[0]["xt_new"].shape[1]
 
             # Store text embeddings just once, with repeat handling during concatenation
             all_rewards = []
@@ -123,7 +124,6 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
             all_tx_uncond_x = []
             all_tx_uncond_length = []
             all_tx_uncond_mask = []
-
 
             for t in timesteps:
                 experiment = results_by_timestep[t]
@@ -149,22 +149,24 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
                 all_tx_uncond_length.append(experiment["tx_uncond-length"])
                 all_tx_uncond_mask.append(experiment["tx_uncond-mask"])
 
+
             # Concatenate all the results for this batch
-            dataset["r"].append(torch.cat(all_rewards, dim=0).view(100, batch_size).T.clone())
-            dataset["xt_1"].append(torch.cat(all_xt_new, dim=0).view(100, batch_size, 100, 205).permute(1, 0, 2, 3))
-            dataset["xt"].append(torch.cat(all_xt_old, dim=0).view(100, batch_size, 100, 205).permute(1, 0, 2, 3))
-            dataset["t"].append(torch.cat(all_t, dim=0).view(100, batch_size).T)
-            dataset["log_like"].append(torch.cat(all_log_probs, dim=0).view(100, batch_size).T)
+            dataset["r"].append(torch.cat(all_rewards, dim=0).view(diff_step, batch_size).T.clone())
+            dataset["xt_1"].append(torch.cat(all_xt_new, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
+            dataset["xt"].append(torch.cat(all_xt_old, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
+            dataset["t"].append(torch.cat(all_t, dim=0).view(diff_step, batch_size).T)
+            dataset["log_like"].append(torch.cat(all_log_probs, dim=0).view(diff_step, batch_size).T)
 
             #y
-            dataset["mask"].append(torch.cat(all_mask, dim=0).view(100, batch_size, 100).permute(1, 0, 2))
-            dataset["length"].append(torch.cat(all_lengths, dim=0).view(100, batch_size).T)
-            dataset["tx_x"].append(torch.cat(all_tx_x, dim=0).view(100, batch_size, 1, 512).permute(1, 0, 2, 3))
-            dataset["tx_length"].append(torch.cat(all_tx_length, dim=0).view(100, batch_size).T)
-            dataset["tx_mask"].append(torch.cat(all_tx_mask, dim=0).view(100, batch_size, 1).permute(1, 0, 2))
-            dataset["tx_uncond_x"].append(torch.cat(all_tx_uncond_x, dim=0).view(100, batch_size, 1, 512).permute(1, 0, 2, 3))
-            dataset["tx_uncond_length"].append(torch.cat(all_tx_uncond_length, dim=0).view(100, batch_size).T)
-            dataset["tx_uncond_mask"].append(torch.cat(all_tx_uncond_mask, dim=0).view(100, batch_size, 1).permute(1, 0, 2))
+            dataset["mask"].append(torch.cat(all_mask, dim=0).view(diff_step, batch_size, seq_len).permute(1, 0, 2))
+            dataset["length"].append(torch.cat(all_lengths, dim=0).view(diff_step, batch_size).T)
+            dataset["tx_x"].append(torch.cat(all_tx_x, dim=0).view(diff_step, batch_size, 1, 512).permute(1, 0, 2, 3))
+            dataset["tx_length"].append(torch.cat(all_tx_length, dim=0).view(diff_step, batch_size).T)
+            dataset["tx_mask"].append(torch.cat(all_tx_mask, dim=0).view(diff_step, batch_size, 1).permute(1, 0, 2))
+            dataset["tx_uncond_x"].append(torch.cat(all_tx_uncond_x, dim=0).view(diff_step, batch_size, 1, 512).permute(1, 0, 2, 3))
+            dataset["tx_uncond_length"].append(torch.cat(all_tx_uncond_length, dim=0).view(diff_step, batch_size).T)
+            dataset["tx_uncond_mask"].append(torch.cat(all_tx_uncond_mask, dim=0).view(diff_step, batch_size, 1).permute(1, 0, 2))
+
 
         break
 
@@ -174,14 +176,13 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
     return dataset
 
 
-def get_y(dataset, i, minibatch_size, infos, diff_step, device):
+def get_batch(dataset, i, minibatch_size, infos, diff_step, device):
     tx_x = dataset["tx_x"][i: i + minibatch_size]
     tx_mask = dataset["tx_mask"][i: i + minibatch_size]
     tx_length = dataset["tx_length"][i: i + minibatch_size]
     tx_uncond_x = dataset["tx_uncond_x"][i: i + minibatch_size]
     tx_uncond_mask = dataset["tx_uncond_mask"][i: i + minibatch_size]
     tx_uncond_length = dataset["tx_uncond_length"][i: i + minibatch_size]
-
     mask = dataset["mask"][i: i + minibatch_size]
     lengths = dataset["length"][i: i + minibatch_size]
 
@@ -205,7 +206,13 @@ def get_y(dataset, i, minibatch_size, infos, diff_step, device):
         "infos": infos,
     }
 
-    return y
+    r = dataset["r"][i: i + minibatch_size].to(device)
+    xt_1 = dataset["xt_1"][i: i + minibatch_size].to(device)
+    xt = dataset["xt"][i: i + minibatch_size].to(device)
+    t = dataset["t"][i: i + minibatch_size].to(device)
+    log_like = dataset["log_like"][i: i + minibatch_size].to(device)
+
+    return y, r, xt_1, xt, t, log_like
 
 
 def prepare_dataset(dataset):
@@ -232,7 +239,7 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
 
     num_minibatches = (dataset["r"].shape[0] + batch_size - 1) // batch_size
 
-    diff_step = dataset["xt_1"][0].shape[1]
+    diff_step = dataset["xt_1"][0].shape[0]
 
     train_bar = tqdm(range(epochs), desc=f"Iteration {iteration + 1}/{iterations} [Train]")
     for e in train_bar:
@@ -241,16 +248,10 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
         dataset = prepare_dataset(dataset)
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
-
-            # r = dataset["r"][batch_idx: batch_idx + batch_size].to(device)
-            xt_1 = dataset["xt_1"][batch_idx: batch_idx + batch_size].to(device)
-            xt = dataset["xt"][batch_idx: batch_idx + batch_size].to(device)
-            t = dataset["t"][batch_idx: batch_idx + batch_size].to(device)
-            log_like = dataset["log_like"][batch_idx: batch_idx + batch_size].to(device)
             advantage = dataset["advantage"][batch_idx: batch_idx + batch_size].to(device)
+            real_batch_size = advantage.shape[0]
 
-            real_batch_size = xt_1.shape[0]
-            y = get_y(dataset, batch_idx, real_batch_size, infos, diff_step, device)
+            y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
 
             new_log_like = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
                                                  xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
@@ -313,12 +314,12 @@ def main(c: DictConfig):
 
     # generations dataset params
     num_examples = 4
-    batch_size = 2
+    batch_size = 1
 
     # training params
     iterations = 10000
     train_epochs = 5
-    train_batch_size = 6
+    train_batch_size = 2
 
     # optimizer params
     lr = 2e-6
@@ -331,7 +332,7 @@ def main(c: DictConfig):
     val_batch_size = 64
 
     fps = 20
-    time = 5
+    time = 1
     infos = {
         "all_lengths": torch.tensor(np.full(2048, time * fps)).to(device),
         "featsname": cfg.motion_features,
