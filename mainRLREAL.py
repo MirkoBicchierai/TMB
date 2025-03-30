@@ -131,6 +131,7 @@ def stillness_reward(sequences, infos, smplh, texts, regularization_weight=1, ep
 
 
 def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, num_examples, n_promt):
+
     model.eval()
 
     dataset = {
@@ -316,13 +317,12 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
 
             ratio = torch.exp(new_log_like - log_like)
 
-            epsilon = 1e-4 # 0.2
+            epsilon =  1e-4 # 0.2
             clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
             policy_loss = -torch.min(ratio * advantage, clip_adv).sum(1).mean()
 
-            tot_loss += policy_loss.item()
-
             policy_loss.backward()
+            tot_loss += policy_loss.item()
 
             grad_norm = torch.sqrt(sum(p.grad.norm() ** 2 for p in model.parameters() if p.grad is not None))
             wandb.log({"Train": {"Gradient Norm": grad_norm.item(), "real_step":(iteration * epochs + e) * num_minibatches + (batch_idx // batch_size)}})
@@ -330,6 +330,7 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
 
             optimizer.step()
+
             minibatch_bar.set_postfix(policy_loss=f"{policy_loss.item():.4f}")
 
         epoch_loss = tot_loss / num_minibatches
@@ -426,14 +427,14 @@ def main(c: DictConfig):
     train_batch_size = 3
 
     # optimizer params
-    lr = 2e-6
+    lr = 1e-5
     betas = (0.9, 0.999)
     eps = 1e-8
-    weight_decay=1e-2
+    weight_decay = 1e-2
 
     # validation/test params
     val_iter = 1000
-    val_batch_size = 16
+    val_batch_size = 1
 
     fps = 20
     time = 5

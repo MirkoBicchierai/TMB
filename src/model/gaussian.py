@@ -148,9 +148,6 @@ class GaussianDiffusion(DiffuserBase):
         loss = {"loss": xloss}
         return loss
 
-
-
-
     def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None, A=None):
         device = self.device
 
@@ -218,62 +215,9 @@ class GaussianDiffusion(DiffuserBase):
 
             return log_probs
 
-    def diffusion_stepRL(self, batch, t=None, xt=None, A=None):
-        mask = batch["mask"]
-
-        device = mask.device
-
-        # normalization
-        x = masked(self.motion_normalizer(batch["x"]), mask)
-
-        tx = batch["tx"]
-        tx["x"] = tx["x"].to(device)
-        tx["mask"] = tx["mask"].to(device)
-        tx_emb = self.prepare_tx_emb(tx)
-
-        y = {
-            "length": batch["length"],
-            "mask": mask,
-            "tx": tx_emb,
-        }
-
-        bs = len(x)
-        # Sample a diffusion step between 0 and T-1
-        # 0 corresponds to noising from x0 to x1
-        # T-1 corresponds to noising from xT-1 to xT
-        if t is None:
-            t = torch.randint(0, self.timesteps, (bs,), device=x.device)
-
-        # Create a noisy version of x
-        # no noise for padded region
-        if xt is None:
-            noise = masked(torch.randn_like(x), mask)
-            xt = self.q_sample(xstart=x, t=t, noise=noise)
-            xt = masked(xt, mask)
-
-        # denoise it
-        # no drop cond -> this is done in the training dataloader already
-        # give "" instead of the text
-        # denoise it
-        output = masked(self.denoiser(xt, y, t), mask)
-
-        # Predictions
-        xstart = masked(self.output_to("x", output, xt, t), mask)
-        xloss = self.reconstruction_loss(xstart, x)
-
-        x_out, _, mean, sigma = self.p_sample_macaluso(xt, y, t)
-
-        if A is None:
-            log_likelihood = self.log_likelihood(x_out, mean, sigma)
-        else:
-            log_likelihood = self.log_likelihood(A, mean, sigma)
-
-        log_probs = log_likelihood.sum(dim=[1, 2])
-
-        return xloss, x_out, xt, t, log_probs
 
     def log_likelihood(self, x, mu, sigma):
-        var = sigma ** 2  # Ensure variance is positive
+        var = sigma ** 2 + 1e-8 # Ensure variance is > 0
         log_prob = -0.5 * (torch.log(2 * torch.pi * var) + ((x - mu) ** 2) / var)
         return log_prob
 
