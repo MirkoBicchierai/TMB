@@ -318,8 +318,13 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
             ratio = torch.exp(new_log_like - log_like)
 
             epsilon =  1e-4 # 0.2
-            clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
-            policy_loss = -torch.min(ratio * advantage, clip_adv).sum(1).mean()
+
+            #clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
+            #policy_loss = -torch.min(ratio * advantage, clip_adv).sum(1).mean()
+
+            unclipped_loss_ddpo = - advantage * ratio
+            clipped_loss_ddpo = - advantage * torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
+            policy_loss = torch.sum(torch.max(unclipped_loss_ddpo, clipped_loss_ddpo))
 
             policy_loss.backward()
             tot_loss += policy_loss.item()
@@ -419,7 +424,7 @@ def main(c: DictConfig):
 
     # generations dataset params
     num_examples = 4
-    n_promt = 16
+    n_promt = 8
 
     # training params
     iterations = 10000
@@ -430,7 +435,7 @@ def main(c: DictConfig):
     lr = 1e-5
     betas = (0.9, 0.999)
     eps = 1e-8
-    weight_decay = 1e-2
+    weight_decay = 1e-4
 
     # validation/test params
     val_iter = 1000
