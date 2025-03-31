@@ -171,7 +171,10 @@ class GaussianDiffusion(DiffuserBase):
             shape = bs, duration, nfeats
             xt = torch.randn(shape, device=device)
 
-            iterator = range(self.timesteps - 1, -1, -1)
+            #iterator = range(self.timesteps - 1, -1, -1)
+
+            iterator = list(range(self.timesteps - 1, -1, -2)) + [0]
+
             results = {}
 
             for diffusion_step in iterator:

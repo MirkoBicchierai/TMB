@@ -165,6 +165,7 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
 
             timesteps = sorted(results_by_timestep.keys(), reverse=True)
             diff_step = len(timesteps)
+
             batch_size = r.shape[0]
             seq_len = results_by_timestep[0]["xt_new"].shape[1]
 
@@ -429,7 +430,7 @@ def main(c: DictConfig):
     # training params
     iterations = 10000
     train_epochs = 5
-    train_batch_size = 3
+    train_batch_size = 6
 
     # optimizer params
     lr = 1e-5
