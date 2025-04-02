@@ -220,7 +220,7 @@ class GaussianDiffusion(DiffuserBase):
 
 
     def log_likelihood(self, x, mu, sigma):
-        var = sigma ** 2 + 1e-8 # Ensure variance is > 0
+        var = sigma ** 2 + 1e-3 # Ensure variance is > 0
         log_prob = -0.5 * (torch.log(2 * torch.pi * var) + ((x - mu) ** 2) / var)
         return log_prob
 
@@ -346,7 +346,6 @@ class GaussianDiffusion(DiffuserBase):
             output = output_uncond + guidance_weight * (output_cond - output_uncond)
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
-
         noise = torch.randn_like(mean)
         x_out = mean + sigma * noise
         xstart = output

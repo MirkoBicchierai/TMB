@@ -92,7 +92,39 @@ def get_embeddings(text_model, batch, device):
     return tx_emb, tx_emb_uncond
 
 
-def stillness_reward(sequences, infos, smplh, texts, regularization_weight=1, epsilon=1e-6):
+def stillness_reward(sequences, infos, smplh, texts):
+    joint_positions = []
+    for idx in range(sequences.shape[0]):
+        x_start = sequences[idx]
+        length = infos["all_lengths"][idx].item()
+        x_start = x_start[:length]
+
+        output = extract_joints(
+            x_start.detach().cpu(),
+            'smplrifke',
+            fps=20,
+            value_from='smpl',
+            smpl_layer=smplh,
+        )
+
+        joints = torch.as_tensor(output["joints"])
+        joint_positions.append(joints)
+
+    joints = torch.stack(joint_positions)  # (batch_size, N_frames, 22, 3)
+    dt = 1.0 / 20
+
+    # Compute velocity and acceleration
+    velocities = torch.diff(joints, dim=1) / dt
+    velocity_loss = torch.mean(velocities.pow(2), dim=(1, 2, 3))
+
+    # Final reward: encourage minimal movement
+    reward = velocity_loss
+
+    return reward
+
+
+
+def sus(sequences, infos, smplh, texts, regularization_weight=1, epsilon=1e-6):
     joint_positions = []
     for idx in range(sequences.shape[0]):
         x_start = sequences[idx]
@@ -130,7 +162,7 @@ def stillness_reward(sequences, infos, smplh, texts, regularization_weight=1, ep
     return reward
 
 
-def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, num_examples, n_promt):
+def generate(model, train_dataloader, iteration, iterations, device, infos, text_model, smplh, num_examples, n_batch):
 
     model.eval()
 
@@ -152,13 +184,14 @@ def generate(model, train_dataloader, iteration, iterations, device, infos, text
 
     }
 
-    generate_bar = tqdm(enumerate(itertools.islice(train_dataloader, n_promt)), desc=f"Iteration {iteration + 1}/{iterations} [Generate new dataset]", total=n_promt)
+    generate_bar = tqdm(enumerate(itertools.islice(train_dataloader, n_batch)), desc=f"Iteration {iteration + 1}/{iterations} [Generate new dataset]", total=n_batch)
     for batch_idx, batch in generate_bar:
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         for i in range(num_examples):
 
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
+
             sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos, guidance_weight=1.0)
 
             r = stillness_reward(sequences, infos, smplh, batch["text"])
@@ -308,24 +341,25 @@ def train(model, optimizer, dataset, iteration, iterations, infos, device, batch
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
 
-            advantage = dataset["advantage"][batch_idx: batch_idx + batch_size].to(device)
-            real_batch_size = advantage.shape[0]
-            y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
-            new_log_like = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
-                                                 xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                 A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                 guidance_weight=1.0).view(real_batch_size, diff_step )
+            with torch.autocast(device_type="cuda"):
+                advantage = dataset["advantage"][batch_idx: batch_idx + batch_size].to(device)
+                real_batch_size = advantage.shape[0]
+                y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
+                new_log_like = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
+                                                     xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
+                                                     A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
+                                                     guidance_weight=1.0).view(real_batch_size, diff_step )
 
             ratio = torch.exp(new_log_like - log_like)
 
             epsilon =  1e-4 # 0.2
 
-            #clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
-            #policy_loss = -torch.min(ratio * advantage, clip_adv).sum(1).mean()
+            clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * advantage
+            policy_loss = -torch.min(ratio * advantage, clip_adv).sum(1).mean()
 
-            unclipped_loss_ddpo = - advantage * ratio
-            clipped_loss_ddpo = - advantage * torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
-            policy_loss = torch.sum(torch.max(unclipped_loss_ddpo, clipped_loss_ddpo))
+            #unclipped_loss_ddpo = - advantage * ratio
+            #clipped_loss_ddpo = - advantage * torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
+            #policy_loss = torch.sum(torch.max(unclipped_loss_ddpo, clipped_loss_ddpo))
 
             policy_loss.backward()
             tot_loss += policy_loss.item()
@@ -363,8 +397,6 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
             r = stillness_reward(sequences, infos, smplh, batch["text"])  # shape [batch_size]
             total_reward += r.sum().item()
             batch_count += r.shape[0]
-
-        break
 
     avg_reward = total_reward / batch_count
 
@@ -425,12 +457,13 @@ def main(c: DictConfig):
 
     # generations dataset params
     num_examples = 4
-    n_promt = 8
+    n_batch = 6
+    batch_size = 6
 
     # training params
     iterations = 10000
     train_epochs = 5
-    train_batch_size = 6
+    train_batch_size = 24
 
     # optimizer params
     lr = 1e-5
@@ -440,7 +473,7 @@ def main(c: DictConfig):
 
     # validation/test params
     val_iter = 1000
-    val_batch_size = 1
+    val_batch_size = 256
 
     fps = 20
     time = 5
@@ -453,7 +486,7 @@ def main(c: DictConfig):
 
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=1,
+        batch_size=batch_size,
         shuffle=True,
         drop_last=False,
         pin_memory=True,
@@ -494,7 +527,7 @@ def main(c: DictConfig):
 
     for iteration in range(iterations):
 
-        train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, iterations, device, infos, text_model, smplh, num_examples, n_promt)
+        train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, iterations, device, infos, text_model, smplh, num_examples, n_batch)
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, iterations, infos, device, train_batch_size, train_epochs)
 
         if (iteration + 1) % val_iter == 0:
