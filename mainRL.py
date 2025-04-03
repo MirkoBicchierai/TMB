@@ -184,7 +184,7 @@ def generate(model, train_dataloader, iteration, args, device, infos, text_model
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
 
             sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
-                                                               guidance_weight=1.0)
+                                                               guidance_weight=args.guidance_weight_generation)
 
             r = stillness_reward(sequences, infos, smplh, batch["text"])
 
@@ -344,7 +344,7 @@ def train(model, optimizer, dataset, iteration, args, infos, device):
                 new_log_like = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
                                                  xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
                                                  A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                 guidance_weight=1.0).view(real_batch_size, diff_step)
+                                                 guidance_weight=args.guidance_weight_train).view(real_batch_size, diff_step)
 
             ratio = torch.exp(new_log_like - log_like)
 
@@ -385,7 +385,7 @@ def train(model, optimizer, dataset, iteration, args, infos, device):
         wandb.log({"Train": {"loss": epoch_loss, "epochs": iteration * args.train_epochs + e}})
 
 
-def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, path):
+def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path):
 
     os.makedirs(path, exist_ok=True)
 
@@ -402,7 +402,7 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=7.0)
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=args.guidance_weight_valid)
             render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path)
             r = stillness_reward(sequences, infos, smplh, batch["text"])  # shape [batch_size]
             total_reward += r.sum().item()
@@ -441,6 +441,10 @@ def parse_arguments():
     parser.add_argument("--iterations", type=int, default=10000, help="Number of iterations")
     parser.add_argument("--train_epochs", type=int, default=4, help="Number of training epochs")
     parser.add_argument("--train_batch_size", type=int, default=48, help="Training batch size")
+    parser.add_argument("--guidance_weight_train", type=float, default=1.0, help="Guidance weight at training time")
+    parser.add_argument("--guidance_weight_generation", type=float, default=1.0, help="Guidance weight at dataset generation time")
+
+    parser.add_argument("--guidance_weight_valid", type=float, default=7.0, help="Guidance weight at test generation time")
 
     # sequence parameters
     parser.add_argument("--fps", type=int, default=20, help="Frames per second")
@@ -551,13 +555,12 @@ def main(c: DictConfig):
         collate_fn=test_dataset.collate_fn
     )
 
-    optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), eps=args.eps, weight_decay=args.weight_decay)
-
     file_path = "ResultRL/VAL/"
     os.makedirs(file_path, exist_ok=True)
 
+    optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), eps=args.eps, weight_decay=args.weight_decay)
 
-    avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,path="ResultRL/VAL/OLD/")
+    avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/VAL/OLD/")
     wandb.log({"Validation": {"Reward": avg_reward, "iterations": 0}})
     print("Avg Reward OLD model:", avg_reward)
 
@@ -567,13 +570,11 @@ def main(c: DictConfig):
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, args, infos, device)
 
         if (iteration + 1) % args.val_iter == 0:
-
-            avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, path="ResultRL/VAL/" + str(iteration + 1) + "/")
+            avg_reward = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/VAL/" + str(iteration + 1) + "/")
             wandb.log({"Validation": {"Reward": avg_reward, "iterations": iteration + 1}})
             print("Avg Reward:", avg_reward, " at iteration:", iteration)
 
-    os.makedirs(file_path, exist_ok=True)
-    avg_reward = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, path="ResultRL/TEST/")
+    avg_reward = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/TEST/")
     wandb.log({"Test": {"Reward": avg_reward}})
     print("Avg Reward Test Set:", avg_reward)
 
