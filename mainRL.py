@@ -18,7 +18,6 @@ import wandb
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
-
 def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path):
     out_formats = ['txt', 'videojoints']  # 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl'
     tmp = file_path
@@ -379,7 +378,6 @@ def parse_arguments():
     parser.add_argument("--num_examples", type=int, default=4, help="Number of examples")
     parser.add_argument("--n_batch", type=int, default=256 // (4 * 12), help="Number of batches")
     parser.add_argument("--batch_size", type=int, default=12, help="Batch size")
-
     parser.add_argument("--num_workers", type=int, default=12, help="Num workers dataloader")
 
     # Training parameters
@@ -397,8 +395,7 @@ def parse_arguments():
     # sequence parameters
     parser.add_argument("--fps", type=int, default=20, help="Frames per second")
     parser.add_argument("--time", type=float, default=2.5, help="Duration in seconds")
-    parser.add_argument("--joint_stype", type=str, default="both", choices=["both", "smpljoints"],
-                        help="Joint style type")
+    parser.add_argument("--joint_stype", type=str, default="both", choices=["both", "smpljoints"], help="Joint style type")
 
     # Optimizer parameters
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate")
@@ -422,12 +419,14 @@ def parse_arguments():
 def main(c: DictConfig):
 
     args = parse_arguments()
+
     wandb.init(
         project="TM-BM",
         name="New_Experiment",
         config={
             "args": vars(args)
-        })
+        }
+    )
 
     create_folder_results("ResultRL")
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -526,7 +525,6 @@ def main(c: DictConfig):
     print("Avg Reward Test Set:", avg_reward)
 
     torch.save(diffusion_rl.state_dict(), 'RL_Model/model_state.pth')
-
 
 
 if __name__ == "__main__":
