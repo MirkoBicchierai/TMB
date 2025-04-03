@@ -1,20 +1,15 @@
 import copy
 import logging
 from collections import defaultdict
-
 from matplotlib.pyplot import barbs
 from tqdm import tqdm
-
 import torch
-
 from .diffusion_base import DiffuserBase
 from ..data.collate import length_to_mask, collate_tensor_with_padding
 from src.stmc import combine_features_intervals, interpolate_intervals, bada_bim_core
-
 import numpy as np
 import os
 import itertools
-
 from src.tools.extract_joints import extract_joints
 from src.tools.smpl_layer import SMPLH
 
@@ -24,7 +19,6 @@ smplh = SMPLH(
     input_pose_rep="axisangle",
     gender="male",
 )
-
 
 # Inplace operator: return the original tensor
 # work with a list of tensor as well
@@ -338,11 +332,9 @@ class GaussianDiffusion(DiffuserBase):
         if guidance_weight == 1.0:
             output = output_cond
         else:
-            y_uncond = y.copy()  # not a deep copy
+            y_uncond = y.copy()
             y_uncond["tx"] = y_uncond["tx_uncond"]
-
             output_uncond = self.denoiser(xt, y_uncond, t)
-            # classifier-free guidance
             output = output_uncond + guidance_weight * (output_cond - output_uncond)
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)

@@ -106,51 +106,11 @@ def stillness_reward(sequences, infos, smplh, texts):
     joints = torch.stack(joint_positions)  # (batch_size, N_frames, 22, 3)
     dt = 1.0 / 200
 
-    # Compute velocity and acceleration
     velocities = torch.diff(joints, dim=1) / dt
     velocity_loss = torch.mean(velocities.pow(2), dim=(1, 2, 3))
 
-    # Final reward: encourage minimal movement
     reward = velocity_loss
-
     return - reward
-
-
-def sus(sequences, infos, smplh, texts, regularization_weight=1, epsilon=1e-6):
-    joint_positions = []
-    for idx in range(sequences.shape[0]):
-        x_start = sequences[idx]
-        length = infos["all_lengths"][idx].item()
-        x_start = x_start[:length]
-
-        output = extract_joints(
-            x_start.detach().cpu(),
-            'smplrifke',
-            fps=20,
-            value_from='smpl',
-            smpl_layer=smplh,
-        )
-
-        joints = torch.as_tensor(output["joints"])
-        joint_positions.append(joints)
-
-    joints = torch.stack(joint_positions)  # (batch_size, N_frames, 22, 3)
-    dt = 1.0 / 20
-    # Compute velocity and acceleration
-    velocities = torch.diff(joints, dim=1) / dt
-    velocity_loss = torch.mean(velocities.pow(2), dim=(1, 2, 3))
-
-    accelerations = torch.diff(velocities, dim=1) / dt
-    acceleration_loss = torch.mean(accelerations.pow(2), dim=(1, 2, 3))
-
-    # Compute displacement from initial pose
-    initial_pose = joints[:, 0:1, :, :]
-    displacement = torch.mean((joints - initial_pose).pow(2), dim=(1, 2, 3))
-
-    # Final reward: encourage minimal movement
-    reward = regularization_weight * (1.0 / (velocity_loss + acceleration_loss + displacement + epsilon))
-
-    return reward
 
 
 def generate(model, train_dataloader, iteration, args, device, infos, text_model, smplh):
@@ -324,21 +284,21 @@ def train(model, optimizer, dataset, iteration, args, infos, device):
     dataset["advantage"][mask] = (dataset["r"][mask] - mean_r) / (std_r + delta)
     dataset["advantage"] = (dataset["r"] - mean_r) / (std_r + delta)
 
-    num_minibatches = (dataset["r"].shape[0] + args.batch_size - 1) // args.batch_size
+    num_minibatches = (dataset["r"].shape[0] + args.train_batch_size - 1) // args.train_batch_size
 
     diff_step = dataset["xt_1"][0].shape[0]
 
     train_bar = tqdm(range(args.train_epochs), desc=f"Iteration {iteration + 1}/{args.iterations} [Train]")
     for e in train_bar:
         tot_loss = 0
-        minibatch_bar = tqdm(range(0, dataset["r"].shape[0], args.batch_size), leave=False, desc="Minibatch")
+        minibatch_bar = tqdm(range(0, dataset["r"].shape[0], args.train_batch_size), leave=False, desc="Minibatch")
 
         dataset = prepare_dataset(dataset)
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
             with torch.autocast(device_type="cuda"):
-                advantage = dataset["advantage"][batch_idx: batch_idx + args.batch_size].to(device)
-                real_batch_size = args.batch_size
+                advantage = dataset["advantage"][batch_idx: batch_idx + args.train_batch_size].to(device)
+                real_batch_size = args.train_batch_size
                 y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
 
                 new_log_like = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
@@ -348,39 +308,24 @@ def train(model, optimizer, dataset, iteration, args, infos, device):
 
             ratio = torch.exp(new_log_like - log_like)
 
-            epsilon = 1e-4  # 0.2
-
             real_adv = advantage[:, -1:]  # r[:,-1:]
 
-            clip_adv = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon) * real_adv
+            clip_adv = torch.clamp(ratio, 1.0 - args.advantage_clip_epsilon, 1.0 + args.advantage_clip_epsilon) * real_adv
             policy_loss = -torch.min(ratio * real_adv, clip_adv).sum(1).mean()
-
-            # unclipped_loss_ddpo = - advantage * ratio
-            # clipped_loss_ddpo = - advantage * torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
-            # policy_loss = torch.sum(torch.max(unclipped_loss_ddpo, clipped_loss_ddpo))
 
             policy_loss.backward()
             tot_loss += policy_loss.item()
 
-            print(policy_loss.item())
-
             grad_norm = torch.sqrt(sum(p.grad.norm() ** 2 for p in model.parameters() if p.grad is not None))
             wandb.log({"Train": {"Gradient Norm": grad_norm.item(),
-                                 "real_step": (iteration * args.train_epochs + e) * num_minibatches + (batch_idx // args.batch_size)}})
+                                 "real_step": (iteration * args.train_epochs + e) * num_minibatches + (batch_idx // args.train_batch_size)}})
 
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
-
-            # optimizer.step()
-            grad_clip = 1.0
-            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-
-            # Update model after all minibatches
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
             optimizer.step()
 
             minibatch_bar.set_postfix(policy_loss=f"{policy_loss.item():.4f}")
 
         epoch_loss = tot_loss / num_minibatches
-        print(tot_loss, num_minibatches)
         train_bar.set_postfix(epoch_loss=f"{epoch_loss:.4f}")
         wandb.log({"Train": {"loss": epoch_loss, "epochs": iteration * args.train_epochs + e}})
 
@@ -441,9 +386,12 @@ def parse_arguments():
     parser.add_argument("--iterations", type=int, default=10000, help="Number of iterations")
     parser.add_argument("--train_epochs", type=int, default=4, help="Number of training epochs")
     parser.add_argument("--train_batch_size", type=int, default=48, help="Training batch size")
+    parser.add_argument("--grad_clip", type=float, default=1.0, help="Gradient clipping")
+    parser.add_argument("--advantage_clip_epsilon", type=float, default=1e-4, help="Advantage clipping epsilon (1e-4, 0.2)")
+
+    # Guidance Weight
     parser.add_argument("--guidance_weight_train", type=float, default=1.0, help="Guidance weight at training time")
     parser.add_argument("--guidance_weight_generation", type=float, default=1.0, help="Guidance weight at dataset generation time")
-
     parser.add_argument("--guidance_weight_valid", type=float, default=7.0, help="Guidance weight at test generation time")
 
     # sequence parameters
@@ -474,10 +422,9 @@ def parse_arguments():
 def main(c: DictConfig):
 
     args = parse_arguments()
-
     wandb.init(
         project="TM-BM",
-        name="experiment_stillness_First_Try",
+        name="New_Experiment",
         config={
             "args": vars(args)
         })
@@ -579,6 +526,7 @@ def main(c: DictConfig):
     print("Avg Reward Test Set:", avg_reward)
 
     torch.save(diffusion_rl.state_dict(), 'RL_Model/model_state.pth')
+
 
 
 if __name__ == "__main__":
