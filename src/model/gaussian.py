@@ -148,7 +148,8 @@ class GaussianDiffusion(DiffuserBase):
         loss = {"loss": xloss}
         return loss
 
-    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None, A=None):
+    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,
+                    A=None):
         device = self.device
 
         if A is None:
@@ -171,7 +172,7 @@ class GaussianDiffusion(DiffuserBase):
             shape = bs, duration, nfeats
             xt = torch.randn(shape, device=device)
 
-            #iterator = range(self.timesteps - 1, -1, -1)
+            # iterator = range(self.timesteps - 1, -1, -1)
 
             iterator = list(range(self.timesteps - 1, -1, -2)) + [0]
 
@@ -218,9 +219,8 @@ class GaussianDiffusion(DiffuserBase):
 
             return log_probs
 
-
     def log_likelihood(self, x, mu, sigma):
-        var = sigma ** 2 + 1e-3 # Ensure variance is > 0
+        var = sigma ** 2 + 1e-8  # Ensure variance is > 0
         log_prob = -0.5 * (torch.log(2 * torch.pi * var) + ((x - mu) ** 2) / var)
         return log_prob
 
@@ -297,7 +297,7 @@ class GaussianDiffusion(DiffuserBase):
         shape = bs, duration, nfeats
         xt = torch.randn(shape, device=device)
 
-        iterator = range(self.timesteps - 1, -1, -1) #range(self.timesteps - 1, -2, -1)
+        iterator = range(self.timesteps - 1, -1, -1)  # range(self.timesteps - 1, -2, -1)
         if progress_bar is not None:
             iterator = progress_bar(list(iterator), desc="Diffusion")
 
@@ -346,6 +346,11 @@ class GaussianDiffusion(DiffuserBase):
             output = output_uncond + guidance_weight * (output_cond - output_uncond)
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
+
+        # TODO Maybe this is the fix
+        # empiricamnte va bene fino a 0.3 poi si rompe la generazione
+        sigma = torch.max(sigma, torch.tensor(0.1))
+
         noise = torch.randn_like(mean)
         x_out = mean + sigma * noise
         xstart = output
