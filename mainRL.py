@@ -101,7 +101,7 @@ def get_embeddings(text_model, batch, device):
     return tx_emb, tx_emb_uncond
 
 
-def stillness_reward(sequences, infos, smplh, texts):
+def stillness_reward(sequences, infos, smplh):
     joint_positions = []
     for idx in range(sequences.shape[0]):
         x_start = sequences[idx]
@@ -145,8 +145,6 @@ def smpl_to_guofeats(smpl, smplh):
         x, y, z = i_joints.T
         i_joints = np.stack((x, z, -y), axis=0).T
         i_guofeats = joints_to_guofeats(i_joints)
-        i_joints = guofeats_to_joints(torch.tensor(i_guofeats))
-        # joints_renderer(i_joints_.numpy(), title="", output= "/andromeda/personal/lmandelli/MotionDiffusionBase/joint_pose_2.mp4", canonicalize=False)
         guofeats.append(i_guofeats)
 
     return guofeats
@@ -175,49 +173,20 @@ def is_list_of_strings(var):
     return isinstance(var, list) and all(isinstance(item, str) for item in var)
 
 def print_matrix_nicely(matrix: np.ndarray):
-    """
-    Stampa una matrice 2D con valori troncati a 3 decimali e colora in verde
-    il massimo per ogni riga.
-
-    Args:
-        matrix (np.ndarray): Matrice 2D di float.
-    """
-    init(autoreset=True)  # per ripristinare i colori automaticamente
-
+    init(autoreset=True)
     if len(matrix.shape) != 2:
         raise ValueError("La matrice deve essere 2D")
-
     for row in matrix:
         max_val = np.max(row)
         line = ""
         for val in row:
-            # Troncamento a 3 decimali (non arrotondamento)
             truncated = int(val * 1000) / 1000
             formatted = f"{truncated:.3f}"
-
-            # Colore verde se massimo della riga
             if val == max_val:
                 line += f"{Fore.GREEN}{formatted}{Style.RESET_ALL}  "
             else:
                 line += f"{formatted}  "
         print(line)
-
-
-def tmr_reward(sequences, infos, smplh, texts):
-    reward_scores = torch.zeros(sequences.shape[0])
-
-    for idx in range(sequences.shape[0]):
-        x_start = sequences[idx]
-        text = texts[idx]
-        length = infos["all_lengths"][idx].item()
-        x_start = x_start[:length]
-
-        motion = [x_start.detach().cpu()]
-        text = [text]
-        sim_matrix = calc_eval_stats(motion, text, smplh)
-        reward_scores[idx] = torch.tensor(sim_matrix[0][0])
-
-    return reward_scores*10
 
 
 def tmr_reward_special(sequences, infos, smplh, texts):
@@ -601,6 +570,7 @@ def parse_arguments():
     parser.add_argument("--eps", type=float, default=1e-8, help="Epsilon value for optimizer")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
 
+    # Loss parameters
     parser.add_argument("--betaL", type=float, default=0, help="Weight of KL Loss") #0.01
     parser.add_argument("--alphaL", type=float, default=1, help="Weight of policy loss") #10
 
@@ -613,6 +583,10 @@ def parse_arguments():
     parser.add_argument("--run_dir", type=str, default='pretrained_models/mdm-smpl_clip_smplrifke_humanml3d', help="Run directory")
     parser.add_argument("--ckpt_name", type=str, default='logs/checkpoints/last.ckpt', help="Checkpoint file name")
 
+    #WanDB parameters
+    parser.add_argument("--experiment_name", type=str, default='New_',help="Experiment name showed in wandb project")
+    parser.add_argument("--group_name", type=str, default='new_group', help="Group name in wandb project")
+
     return parser.parse_args()
 
 
@@ -622,12 +596,12 @@ def main(c: DictConfig):
     args = parse_arguments()
 
     wandb.init(
-        project="TM-BM",
-        name="New_Experiment", # datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        project = "TM-BM",
+        name = args.experiment_name,
         config={
             "args": vars(args)
         },
-        group=""
+        group = args.group_name
     )
 
     create_folder_results("ResultRL")
@@ -726,12 +700,13 @@ def main(c: DictConfig):
         if (iteration + 1) % args.val_iter == 0:
             avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/VAL/" + str(iteration + 1) + "/")
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": iteration + 1}})
+            torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpont_'+str(iteration + 1)+'.pth')
 
 
     avg_reward, avg_tmr = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/TEST/")
     wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr}})
 
-    torch.save(diffusion_rl.state_dict(), 'RL_Model/model_state.pth')
+    torch.save(diffusion_rl.state_dict(), 'RL_Model/model_final.pth')
 
 
 if __name__ == "__main__":
