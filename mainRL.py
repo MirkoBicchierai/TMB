@@ -152,7 +152,7 @@ def smpl_to_guofeats(smpl, smplh):
 
 def calc_eval_stats(X, Y, smplh):
     """
-        Calculate Motion2Motion (m2m) and the Motion2Text (m2t) between the recostructed motion, the gt motion and the gt text.
+        Calculate Motion2Motion (m2m) and the Motion2Text (m2t) between the reconstructed motion, the gt motion and the gt text.
     """
     if is_list_of_strings(X):
         X_latents = tmr_forward(X)  # tensor(N, 256)
@@ -174,8 +174,6 @@ def is_list_of_strings(var):
 
 def print_matrix_nicely(matrix: np.ndarray):
     init(autoreset=True)
-    if len(matrix.shape) != 2:
-        raise ValueError("La matrice deve essere 2D")
     for row in matrix:
         max_val = np.max(row)
         line = ""
@@ -571,8 +569,8 @@ def parse_arguments():
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
 
     # Loss parameters
-    parser.add_argument("--betaL", type=float, default=0, help="Weight of KL Loss") #0.01
-    parser.add_argument("--alphaL", type=float, default=1, help="Weight of policy loss") #10
+    parser.add_argument("--betaL", type=float, default=0, help="Weight of KL Loss") # 0.01
+    parser.add_argument("--alphaL", type=float, default=1, help="Weight of policy loss") # 10
 
     # Validation/Test parameters
     parser.add_argument("--val_iter", type=int, default=25, help="Validation iterations")
@@ -700,7 +698,7 @@ def main(c: DictConfig):
         if (iteration + 1) % args.val_iter == 0:
             avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/VAL/" + str(iteration + 1) + "/")
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": iteration + 1}})
-            torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpont_'+str(iteration + 1)+'.pth')
+            torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_'+str(iteration + 1)+'.pth')
 
 
     avg_reward, avg_tmr = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer,args, path="ResultRL/TEST/")
