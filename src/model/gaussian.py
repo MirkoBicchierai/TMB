@@ -207,11 +207,11 @@ class GaussianDiffusion(DiffuserBase):
 
         else:
 
-            _, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.mean(dim=[1, 2])
 
-            return log_probs
+            return log_probs, xt_pred
 
     def log_likelihood(self, x, mu, sigma):
         var = sigma ** 2 + 1e-8  # Ensure variance is > 0

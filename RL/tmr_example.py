@@ -106,23 +106,23 @@ def calc_eval_stats(X, Y):
 
 
 motion_paths = [
-    "ResultRL/VAL/OLD/batch_0/0/0_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/1/1_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/2/2_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/3/3_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/4/4_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/5/5_smpl.npy",
-    "ResultRL/VAL/OLD/batch_0/6/6_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/0/0_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/1/1_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/2/2_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/3/3_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/4/4_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/5/5_smpl.npy",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/6/6_smpl.npy",
 ]
 
 text_paths = [
-    "ResultRL/VAL/OLD/batch_0/0/0.txt",
-    "ResultRL/VAL/OLD/batch_0/1/1.txt",
-    "ResultRL/VAL/OLD/batch_0/2/2.txt",
-    "ResultRL/VAL/OLD/batch_0/3/3.txt",
-    "ResultRL/VAL/OLD/batch_0/4/4.txt",
-    "ResultRL/VAL/OLD/batch_0/5/5.txt",
-    "ResultRL/VAL/OLD/batch_0/6/6.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/0/0.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/1/1.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/2/2.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/3/3.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/4/4.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/5/5.txt",
+    "/home/mbicchierai/Tesi Magistrale/ResultRL/VAL/OLD/batch_0/6/6.txt",
 ]
 
 motions = []
