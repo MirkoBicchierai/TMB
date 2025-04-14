@@ -339,7 +339,6 @@ class GaussianDiffusion(DiffuserBase):
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
 
-        # TODO Maybe this is the fix
         # empiricamnte va bene fino a 0.3 poi si rompe la generazione
         sigma = torch.max(sigma, torch.tensor(0.1))
 
