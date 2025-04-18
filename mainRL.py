@@ -682,9 +682,9 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
-    train_dataset = instantiate(cfg.data, split="train")
-    val_dataset = instantiate(cfg.data, split="val")
-    test_dataset = instantiate(cfg.data, split="val")
+    train_dataset = instantiate(cfg.data, split="walk_train")
+    val_dataset = instantiate(cfg.data, split="walk_val")
+    test_dataset = instantiate(cfg.data, split="walk_val")
 
     infos = {
         "all_lengths": torch.tensor(np.full(2048, int(c.time * c.fps))).to(device),
