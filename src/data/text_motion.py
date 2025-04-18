@@ -19,7 +19,7 @@ def read_split(path, split):
     return id_list
 
 
-def load_annotations(path, name="annotations.json"):
+def load_annotations(path, name="annotations_mod.json"):
     json_path = os.path.join(path, name)
     with open(json_path, "rb") as ff:
         return orjson.loads(ff.read())
@@ -64,7 +64,8 @@ class TextMotionDataset(Dataset):
         if "test" not in split: 
             self.annotations = self.filter_annotations(self.annotations)
 
-        self.is_training = "train" in split
+        #self.is_training = "train" in split
+        self.is_training = False
         self.drop_motion_perc = drop_motion_perc
         self.drop_cond = drop_cond
         self.drop_trans = drop_trans
@@ -72,7 +73,7 @@ class TextMotionDataset(Dataset):
         self.keyids = [keyid for keyid in self.keyids if keyid in self.annotations]
         self.nfeats = self.motion_loader.nfeats
 
-        if preload and False:
+        if preload:
             for _ in tqdm(self, desc="Preloading the dataset"):
                 continue
 
@@ -89,16 +90,19 @@ class TextMotionDataset(Dataset):
         # Take the first one for testing/validation
         # Otherwise take a random one
         index = 0
-        if self.is_training:
+
+        easy = True # TODO ci piacciono le cose facili
+
+        if self.is_training and not easy:
             index = np.random.randint(len(annotations["annotations"]))
 
         annotation = annotations["annotations"][index]
         text = annotation["text"]
-
+        tmr_text = np.array(annotation["text_tmr"])
 
         drop_motion_perc = None
         load_transition = False
-        if self.is_training:
+        if self.is_training and not easy:
             drop_motion_perc = self.drop_motion_perc
             drop_cond = self.drop_cond
             drop_trans = self.drop_trans
@@ -127,6 +131,7 @@ class TextMotionDataset(Dataset):
         output = {
             "x": x,
             "text": text,
+            "tmr_text":tmr_text,
             "tx": text_encoded,
             "tx_uncond": text_uncond_encoded,
             "keyid": keyid,

@@ -1,9 +1,30 @@
-defaults:
-  - joints_renderer: matplotlib
-  - smpl_renderer: humor
-  - defaults
-  - _self_
+joints_renderer:
+  _target_: src.renderer.matplotlib.MatplotlibRender
+  jointstype: "guoh3djoints"
+  fps: 20.0
+  colors: ['black', 'magenta', 'red', 'green', 'blue']
+  figsize: 4
+  canonicalize: true
 
+smpl_renderer:
+  _target_: src.renderer.humor.HumorRenderer
+  fps: 20.0
+  imw: 720
+  imh: 720
+
+diffusion:
+  weight: 1.0
+  mcd: True
+
+  denoiser:
+    dropout: 0.0
+
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 16 # 128
+  num_workers: 12
+
+dataset: humanml3d # kitml
 run_dir: pretrained_models/mdm-smpl_clip_smplrifke_humanml3d
 input_type: auto # timeline / text
 single_frame: false # render or not summary frame with smpl
@@ -16,14 +37,57 @@ overlap_s: 0.5
 ckpt: last
 device: cuda
 value_from: smpl
+####################ROBA CHE ERA NEL ARGPARSE
+# General parameters
+num_gen_per_prompt: 4
+#generated_dataset_size: 256
+num_prompts_dataset: 32
+num_workers: 6
+#generation_iter: {generated_dataset_size} // ({num_examples} * {num_prompts_dataset})
+#generation_iter = c.generated_dataset_size // (c.num_gen_per_prompt * c.num_prompts_dataset)
 
-diffusion:
-  weight: 1.0
-  mcd: True
+# Training parameters
+iterations: 700
+train_epochs: 4
+train_batch_size: 48
+grad_clip: 1.0
+advantage_clip_epsilon: 1e-4
 
-dataloader:
-  _target_: torch.utils.data.DataLoader
-  batch_size: 16 # 128
-  num_workers: 12
+# Reward Model
+tmr_reward: true
+masking_ratio: 0.75
+reward_scale: 10
 
-dataset: humanml3d # kitml
+# Guidance Weight
+guidance_weight_train: 5.0
+guidance_weight_generation: 5.0
+guidance_weight_valid: 5.0
+
+# Sequence parameters
+fps: 20
+time: 2.5
+joint_stype: "both"  # Can be either "both" or "smpljoints"
+
+# Optimizer parameters
+lr: 1e-5
+beta1: 0.9
+beta2: 0.999
+eps: 1e-8
+weight_decay: 1e-4
+
+# Loss parameters
+betaL: 0
+alphaL: 1
+
+# Validation/Test parameters
+val_iter: 25
+val_batch_size: 16
+val_num_batch: 4
+
+# Pretrained model parameters
+#run_dir: 'pretrained_models/mdm-smpl_clip_smplrifke_humanml3d'
+ckpt_name: 'logs/checkpoints/last.ckpt'
+
+# WanDB parameters
+experiment_name: 'New_'
+group_name: ''

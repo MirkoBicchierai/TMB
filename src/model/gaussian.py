@@ -142,77 +142,6 @@ class GaussianDiffusion(DiffuserBase):
         loss = {"loss": xloss}
         return loss
 
-    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,
-                    A=None):
-        device = self.device
-
-        if A is None:
-
-            lengths = infos["all_lengths"][0:tx_emb["x"].shape[0]]
-            mask = length_to_mask(lengths, device=device)
-
-            y = {
-                "length": lengths,
-                "mask": mask,
-                "tx": self.prepare_tx_emb(tx_emb),
-                "tx_uncond": self.prepare_tx_emb(tx_emb_uncond),
-                "infos": infos,
-            }
-
-            bs = len(lengths)
-            duration = max(lengths)
-            nfeats = self.denoiser.nfeats
-
-            shape = bs, duration, nfeats
-            xt = torch.randn(shape, device=device)
-
-            # iterator = range(self.timesteps - 1, -1, -1)
-
-            iterator = list(range(self.timesteps - 1, -1, -2)) + [0]
-
-            results = {}
-
-            for diffusion_step in iterator:
-                t = torch.full((bs,), diffusion_step, device=device)
-                xt_old = xt.clone()
-
-                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
-                log_likelihood = self.log_likelihood(xt, mean, sigma)
-                log_prob = log_likelihood.mean(dim=[1, 2])
-
-                results[diffusion_step] = {
-
-                    "t": diffusion_step,  # begin the t
-                    "xt_old": xt_old,  # begin the xt
-                    "xt_new": xt.clone(),  # begin the A when train PPO
-                    "log_prob": log_prob,
-
-                    "length": lengths,
-                    "mask": mask,
-                    "tx-x": y["tx"]["x"],
-                    "tx-length": y["tx"]["length"],
-                    "tx-mask": y["tx"]["mask"],
-
-                    "tx_uncond-x": y["tx_uncond"]["x"],
-                    "tx_uncond-length": y["tx_uncond"]["length"],
-                    "tx_uncond-mask": y["tx_uncond"]["mask"],
-
-                }
-
-                results = {k: v.detach().to("cpu") if isinstance(v, torch.Tensor) else v for k, v in results.items()}
-
-            x_start = self.motion_normalizer.inverse(x_start)
-
-            return x_start, results
-
-        else:
-
-            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
-            log_likelihood = self.log_likelihood(A, mean, sigma)
-            log_probs = log_likelihood.mean(dim=[1, 2])
-
-            return log_probs, xt_pred
-
     def log_likelihood(self, x, mu, sigma):
         var = sigma ** 2 + 1e-8  # Ensure variance is > 0
         log_prob = -0.5 * (torch.log(2 * torch.pi * var) + ((x - mu) ** 2) / var)
@@ -346,3 +275,75 @@ class GaussianDiffusion(DiffuserBase):
         x_out = mean + sigma * noise
         xstart = output
         return x_out, xstart, mean, sigma
+
+
+    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,
+                    A=None):
+        device = self.device
+
+        if A is None:
+
+            lengths = infos["all_lengths"][0:tx_emb["x"].shape[0]]
+            mask = length_to_mask(lengths, device=device)
+
+            y = {
+                "length": lengths,
+                "mask": mask,
+                "tx": self.prepare_tx_emb(tx_emb),
+                "tx_uncond": self.prepare_tx_emb(tx_emb_uncond),
+                "infos": infos,
+            }
+
+            bs = len(lengths)
+            duration = max(lengths)
+            nfeats = self.denoiser.nfeats
+
+            shape = bs, duration, nfeats
+            xt = torch.randn(shape, device=device)
+
+            # iterator = range(self.timesteps - 1, -1, -1)
+
+            iterator = list(range(self.timesteps - 1, -1, -2)) + [0]
+
+            results = {}
+
+            for diffusion_step in iterator:
+                t = torch.full((bs,), diffusion_step, device=device)
+                xt_old = xt.clone()
+
+                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+                log_likelihood = self.log_likelihood(xt, mean, sigma)
+                log_prob = log_likelihood.mean(dim=[1, 2])
+
+                results[diffusion_step] = {
+
+                    "t": diffusion_step,  # begin the t
+                    "xt_old": xt_old.detach().cpu(),  # begin the xt
+                    "xt_new": xt.clone().detach().cpu(),  # begin the A when train PPO
+                    "log_prob": log_prob.detach().cpu(),
+
+                    "length": lengths.detach().cpu(),
+                    "mask": mask.detach().cpu(),
+                    "tx-x": y["tx"]["x"],
+                    "tx-length": y["tx"]["length"],
+                    "tx-mask": y["tx"]["mask"],
+
+                    "tx_uncond-x": y["tx_uncond"]["x"],
+                    "tx_uncond-length": y["tx_uncond"]["length"],
+                    "tx_uncond-mask": y["tx_uncond"]["mask"],
+
+                }
+
+                results = {k: v.detach().to("cpu") if isinstance(v, torch.Tensor) else v for k, v in results.items()}
+
+            x_start = self.motion_normalizer.inverse(x_start)
+
+            return x_start, results
+
+        else:
+
+            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+            log_likelihood = self.log_likelihood(A, mean, sigma)
+            log_probs = log_likelihood.mean(dim=[1, 2])
+
+            return log_probs, xt_pred
