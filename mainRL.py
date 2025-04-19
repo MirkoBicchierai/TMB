@@ -28,15 +28,9 @@ os.environ["PYOPENGL_PLATFORM"] = "egl"
 tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
 
 
-def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, video_log=False):
-    out_formats = ['txt', 'videojoints', 'smpl']  # 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl'
+def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, ty_log, video_log=False):
+    out_formats = ['txt', 'smpl', 'videojoints']# ['txt', 'smpl', 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl']
     tmp = file_path
-    ty_log = ""
-
-    if "VAL" in file_path:
-        ty_log = "Validation"
-    else:
-        ty_log = "Test"
 
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
 
@@ -256,8 +250,7 @@ def preload_tmr_text(dataloader):
 
 
 @torch.no_grad()
-def generate(model, train_dataloader, iteration, c, device, infos, text_model, smplh,
-             train_embedding_tmr):  # , generation_iter
+def generate(model, train_dataloader, iteration, c, device, infos, text_model, smplh, train_embedding_tmr):  # , generation_iter
     model.train()
 
     dataset = {
@@ -289,8 +282,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         tx_emb, tx_emb_uncond = get_embeddings_2(text_model, batch, c.num_gen_per_prompt, device)
 
-        sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
-                                                           guidance_weight=c.guidance_weight_generation)
+        sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos, guidance_weight=c.guidance_weight)
 
         reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1), train_embedding_tmr, c)
 
@@ -455,28 +447,29 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
         dataset = prepare_dataset(dataset)
         for batch_idx in minibatch_bar:
             optimizer.zero_grad()
-            with torch.autocast(device_type="cuda"):
-                advantage = dataset["advantage"][batch_idx: batch_idx + c.train_batch_size].to(device)
-                real_batch_size = advantage.shape[0]
-                y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
+            #with torch.autocast(device_type="cuda"):
+            advantage = dataset["advantage"][batch_idx: batch_idx + c.train_batch_size].to(device)
+            real_batch_size = advantage.shape[0]
+            y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
 
-                new_log_like, rl_pred = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
-                                                          xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                          A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                          guidance_weight=c.guidance_weight_train)
-                new_log_like = new_log_like.view(real_batch_size, diff_step)
-                rl_pred = rl_pred.view(real_batch_size, diff_step, *rl_pred.shape[1:])
+            new_log_like, rl_pred = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
+                                                      xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
+                                                      A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
+                                                      guidance_weight=c.guidance_weight)
+            new_log_like = new_log_like.view(real_batch_size, diff_step)
+            rl_pred = rl_pred.view(real_batch_size, diff_step, *rl_pred.shape[1:])
 
-                if c.betaL > 0:
-                    _, old_pred = old_model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
-                                                        xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                        A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                        guidance_weight=c.guidance_weight_train)
-                    old_pred = old_pred.view(real_batch_size, diff_step, *old_pred.shape[1:])
-                    kl_div = ((rl_pred - old_pred) ** 2).sum(1).mean()
+            if c.betaL > 0:
+                _, old_pred = old_model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
+                                                    xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
+                                                    A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
+                                                    guidance_weight=c.guidance_weight)
+                old_pred = old_pred.view(real_batch_size, diff_step, *old_pred.shape[1:])
+                kl_div = ((rl_pred - old_pred) ** 2).sum(1).mean()
 
             ratio = torch.exp(new_log_like - log_like)
-
+            # torch.set_printoptions(precision=4)
+            
             real_adv = advantage[:, -1:]  # r[:,-1:]
 
             # Count how many elements need clipping
@@ -533,6 +526,13 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
          path):
     os.makedirs(path, exist_ok=True)
 
+    ty_log = ""
+
+    if "VAL" in path:
+        ty_log = "Validation"
+    else:
+        ty_log = "Test"
+
     model.eval()
 
     if c.val_num_batch == 0:
@@ -551,11 +551,12 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=c.guidance_weight_valid)
-            render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path,
-                   video_log=True if batch_idx == 0 else False)
-            reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
-                                             c)  # shape [batch_size]
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=c.guidance_weight)
+
+            if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
+                render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, video_log=True)
+
+            reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr, c)  # shape [batch_size]
 
             total_reward += reward.sum().item()
             batch_count_reward += reward.shape[0]
@@ -674,6 +675,43 @@ def main(c: DictConfig):
     #freeze_except_last_layers(diffusion_rl)
     freeze_normalization_layers(diffusion_rl)
 
+    if c.lora:
+        """LORA"""
+        from peft import LoraModel, LoraConfig
+        lora_config = LoraConfig(
+            r=c.lora_rank,  # or 8 if more expressive adaptation is needed
+            lora_alpha=c.lora_alpha,  # usually 4*r is a good starting point
+            target_modules=[
+                "to_skel_layer",
+                "skel_embedding",
+                "tx_embedding.0",
+                "tx_embedding.2",
+                "seqTransEncoder.layers.0.self_attn.out_proj",
+                "seqTransEncoder.layers.1.self_attn.out_proj",
+                "seqTransEncoder.layers.2.self_attn.out_proj",
+                "seqTransEncoder.layers.3.self_attn.out_proj",
+                "seqTransEncoder.layers.4.self_attn.out_proj",
+                "seqTransEncoder.layers.5.self_attn.out_proj",
+                "seqTransEncoder.layers.6.self_attn.out_proj",
+                "seqTransEncoder.layers.7.self_attn.out_proj",
+
+            ],
+            lora_dropout=c.lora_dropout,
+            bias="none",
+        )
+
+        # Freeze all parameters except LoRA
+        for name, param in diffusion_rl.denoiser.named_parameters():
+            if 'lora_' not in name:
+                param.requires_grad = False
+
+        diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
+        # Check trainable parameters
+        trainable_params = [name for name, param in diffusion_rl.denoiser.named_parameters() if param.requires_grad]
+        print("Trainable parameters:", trainable_params)
+
+        """END LORA"""
+
     if c.betaL > 0:
         diffusion_old = instantiate(cfg.diffusion)
         diffusion_old.load_state_dict(ckpt["state_dict"])
@@ -682,21 +720,21 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
-    train_dataset = instantiate(cfg.data, split="walk_train")
-    val_dataset = instantiate(cfg.data, split="walk_val")
-    test_dataset = instantiate(cfg.data, split="walk_val")
+    train_dataset = instantiate(cfg.data, split=str(c.dataset_name)+"train")
+    val_dataset = instantiate(cfg.data, split=str(c.dataset_name)+"val")
+    test_dataset = instantiate(cfg.data, split=str(c.dataset_name)+"test")
 
     infos = {
         "all_lengths": torch.tensor(np.full(2048, int(c.time * c.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": c.fps,
-        "guidance_weight": c.guidance
+        "guidance_weight": c.guidance_weight
     }
 
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=c.num_prompts_dataset,
-        shuffle=True,
+        shuffle=True, # True
         drop_last=False,
         num_workers=c.num_workers,
         collate_fn=train_dataset.collate_fn
@@ -729,23 +767,24 @@ def main(c: DictConfig):
     file_path = "ResultRL/VAL/"
     os.makedirs(file_path, exist_ok=True)
 
-    optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=c.lr, betas=(c.beta1, c.beta2), eps=c.eps,
+    if c.lora:
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, diffusion_rl.denoiser.parameters()), lr=c.lr, betas=(c.beta1, c.beta2), eps=c.eps,
                                   weight_decay=c.weight_decay)
-    avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
-                               smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/OLD/")
+    else:
+        optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=c.lr, betas=(c.beta1, c.beta2), eps=c.eps,
+                                      weight_decay=c.weight_decay)
+
+    avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/OLD/")
     wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": 0}})
 
     iter_bar = tqdm(range(c.iterations), desc="Iterations", total=c.iterations)
     for iteration in iter_bar:
 
-        train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh,
-                                     train_embedding_tmr)  # , generation_iter
+        train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh, train_embedding_tmr)  # , generation_iter
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_old)
 
         if (iteration + 1) % c.val_iter == 0:
-            avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
-                                       smpl_renderer, c, val_embedding_tmr,
-                                       path="ResultRL/VAL/" + str(iteration + 1) + "/")
+            avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/" + str(iteration + 1) + "/")
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": iteration + 1}})
             torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
             iter_bar.set_postfix(val_tmr=f"{avg_tmr:.4f}")

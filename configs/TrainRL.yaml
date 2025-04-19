@@ -30,7 +30,7 @@ input_type: auto # timeline / text
 single_frame: false # render or not summary frame with smpl
 gender: male
 
-guidance: 1
+guidance_weight: 1.0
 baseline: none
 
 overlap_s: 0.5
@@ -58,11 +58,6 @@ tmr_reward: true
 masking_ratio: 0.75
 reward_scale: 10
 
-# Guidance Weight
-guidance_weight_train: 5.0
-guidance_weight_generation: 5.0
-guidance_weight_valid: 5.0
-
 # Sequence parameters
 fps: 20
 time: 2.5
@@ -87,6 +82,13 @@ val_num_batch: 4
 # Pretrained model parameters
 #run_dir: 'pretrained_models/mdm-smpl_clip_smplrifke_humanml3d'
 ckpt_name: 'logs/checkpoints/last.ckpt'
+
+dataset_name: ''
+
+lora: false
+lora_rank: 4
+lora_alpha: 16
+lora_dropout: 0.1
 
 # WanDB parameters
 experiment_name: 'New_'
