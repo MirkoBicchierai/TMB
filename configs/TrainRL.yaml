@@ -19,7 +19,6 @@ diffusion:
   denoiser:
     dropout: 0.0
 
-
 # Pretrained model parameters
 ckpt_name: 'logs/checkpoints/last.ckpt'
 dataset: humanml3d # kitml
