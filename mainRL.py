@@ -616,7 +616,7 @@ def main(c: DictConfig):
 
     ckpt_path = os.path.join(c.run_dir, c.ckpt_name)
     print("Loading the checkpoint")
-    ckpt = torch.load(str(ckpt_path), map_location=c.device)
+    ckpt = torch.load(str(ckpt_path), map_location=device)
 
     joints_renderer = instantiate(c.joints_renderer)
     smpl_renderer = instantiate(c.smpl_renderer)
@@ -647,8 +647,8 @@ def main(c: DictConfig):
     if c.lora:
         """LORA"""
         lora_config = LoraConfig(
-            r=c.lora_rank,  # or 8 if more expressive adaptation is needed
-            lora_alpha=c.lora_alpha,  # usually 4*r is a good starting point
+            r=c.lora_rank,
+            lora_alpha=c.lora_alpha,
             target_modules=[
                 "to_skel_layer",
                 "skel_embedding",
@@ -665,8 +665,7 @@ def main(c: DictConfig):
 
             ],
             lora_dropout=c.lora_dropout,
-            bias="none",
-            # Parametri sketch da controllare init_lora_weights, use_rslora
+            bias= c.lora_bias,
         )
 
         # Freeze all parameters except LoRA

@@ -46,8 +46,6 @@ def train(cfg: DictConfig):
         shuffle=True,
     )
 
-
-
     val_dataloader = instantiate(
         cfg.dataloader,
         dataset=val_dataset,

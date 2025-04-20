@@ -19,10 +19,6 @@ diffusion:
   denoiser:
     dropout: 0.0
 
-dataloader:
-  _target_: torch.utils.data.DataLoader
-  batch_size: 16 # 128
-  num_workers: 12
 
 # Pretrained model parameters
 ckpt_name: 'logs/checkpoints/last.ckpt'
@@ -37,7 +33,6 @@ baseline: none
 
 overlap_s: 0.5
 ckpt: last
-device: cuda
 value_from: smpl
 
 
@@ -89,6 +84,7 @@ lora: false
 lora_rank: 4
 lora_alpha: 16
 lora_dropout: 0.1
+lora_bias: "none"
 
 # WanDB parameters
 experiment_name: 'New_'
