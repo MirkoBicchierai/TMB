@@ -277,7 +277,7 @@ class GaussianDiffusion(DiffuserBase):
         return x_out, xstart, mean, sigma
 
 
-    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None, A=None):
+    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None, A=None):
         device = self.device
 
         if A is None:
@@ -340,7 +340,7 @@ class GaussianDiffusion(DiffuserBase):
             return x_start, results
 
         else:
-            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.mean(dim=[1, 2])
 

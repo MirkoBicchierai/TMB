@@ -282,7 +282,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         tx_emb, tx_emb_uncond = get_embeddings_2(text_model, batch, c.num_gen_per_prompt, device)
 
-        sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos, guidance_weight=c.guidance_weight)
+        sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos)
 
         reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1), train_embedding_tmr, c)
 
@@ -454,16 +454,15 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
 
             new_log_like, rl_pred = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
                                                       xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                      A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                      guidance_weight=c.guidance_weight)
+                                                      A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]))
+
             new_log_like = new_log_like.view(real_batch_size, diff_step)
             rl_pred = rl_pred.view(real_batch_size, diff_step, *rl_pred.shape[1:])
 
             if c.betaL > 0:
                 _, old_pred = old_model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
                                                     xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                    A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
-                                                    guidance_weight=c.guidance_weight)
+                                                    A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]))
                 old_pred = old_pred.view(real_batch_size, diff_step, *old_pred.shape[1:])
                 kl_div = ((rl_pred - old_pred) ** 2).sum(1).mean()
 
@@ -551,7 +550,7 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=c.guidance_weight)
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
 
             if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, video_log=True)
