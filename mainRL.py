@@ -1,4 +1,3 @@
-import argparse
 import itertools
 import os
 import shutil
@@ -8,7 +7,6 @@ import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
-
 from src.tools.smpl_layer import SMPLH
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -21,6 +19,7 @@ from TMR.mtt.load_tmr_model import load_tmr_model_easy
 from src.tools.guofeats.motion_representation import joints_to_guofeats
 from TMR.src.guofeats import joints_to_guofeats
 from TMR.src.model.tmr import get_sim_matrix
+from peft import LoraModel, LoraConfig
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -580,64 +579,35 @@ def create_folder_results(name):
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
 
-
-def freeze_except_last_layers(model):
-    # Freeze all parameters by default
-    for param in model.denoiser.parameters():
-        param.requires_grad = False
-
-    # Unfreeze the last linear layer
-    for param in model.denoiser.to_skel_layer.parameters():
-        param.requires_grad = True
-
-    # Unfreeze the last transformer layer in seqTransEncoder
-    # TransformerEncoder stores layers in a ModuleList called 'layers'
-    last_transformer_layer_index = len(model.denoiser.seqTransEncoder.layers) - 1
-    for param in model.denoiser.seqTransEncoder.layers[last_transformer_layer_index].parameters():
-        param.requires_grad = True
-
-    # Print status to verify
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    frozen_params = total_params - trainable_params
-
-    print(f"Total parameters: {total_params}")
-    print(f"Trainable parameters: {trainable_params} ({trainable_params / total_params:.2%})")
-    print(f"Frozen parameters: {frozen_params} ({frozen_params / total_params:.2%})")
-
-
 def freeze_normalization_layers(model):
-    # First, make sure all parameters are trainable by default
+
     for param in model.denoiser.parameters():
         param.requires_grad = True
 
-    # Then, freeze only the normalization layers
     for name, module in model.denoiser.named_modules():
         if isinstance(module, (nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
             for param in module.parameters():
                 param.requires_grad = False
 
-    # Print status to verify
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     frozen_params = total_params - trainable_params
 
-    print(f"Total parameters: {total_params}")
-    print(f"Trainable parameters: {trainable_params} ({trainable_params / total_params:.2%})")
-    print(f"Frozen parameters: {frozen_params} ({frozen_params / total_params:.2%})")
+    print(f"Total parameters DENOISER MODEL: {total_params}")
+    print(f"Trainable parameters of DENOISER MODEL after freeze normalization layers: {trainable_params} ({trainable_params / total_params:.2%})")
+    print(f"Frozen parameters after freeze normalization layers: {frozen_params} ({frozen_params / total_params:.2%})")
 
 @hydra.main(config_path="configs", config_name="TrainRL", version_base="1.3")
 def main(c: DictConfig):
-    # args = parse_arguments()#
+
     config_dict = OmegaConf.to_container(c, resolve=True)
+
     wandb.init(
         project="TM-BM",
         name=c.experiment_name,
         config=config_dict,
         group=c.group_name
     )
-
-    # generation_iter = c.generated_dataset_size // (c.num_gen_per_prompt * c.num_prompts_dataset)
 
     create_folder_results("ResultRL")
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -671,12 +641,11 @@ def main(c: DictConfig):
     diffusion_rl.load_state_dict(ckpt["state_dict"])
     diffusion_rl = diffusion_rl.to(device)
 
-    #freeze_except_last_layers(diffusion_rl)
-    freeze_normalization_layers(diffusion_rl)
+    if c.freeze_normalization_layers:
+        freeze_normalization_layers(diffusion_rl)
 
     if c.lora:
         """LORA"""
-        from peft import LoraModel, LoraConfig
         lora_config = LoraConfig(
             r=c.lora_rank,  # or 8 if more expressive adaptation is needed
             lora_alpha=c.lora_alpha,  # usually 4*r is a good starting point
@@ -697,6 +666,7 @@ def main(c: DictConfig):
             ],
             lora_dropout=c.lora_dropout,
             bias="none",
+            # Parametri sketch da controllare init_lora_weights, use_rslora
         )
 
         # Freeze all parameters except LoRA
@@ -705,9 +675,12 @@ def main(c: DictConfig):
                 param.requires_grad = False
 
         diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
+
         # Check trainable parameters
         trainable_params = [name for name, param in diffusion_rl.denoiser.named_parameters() if param.requires_grad]
-        print("Trainable parameters:", trainable_params)
+        print("Trainable LorA layer:", trainable_params)
+        total_trainable_params = sum(p.numel() for p in diffusion_rl.denoiser.parameters() if p.requires_grad)
+        print(f"Trainable parameters LorA: {total_trainable_params:,}")
 
         """END LORA"""
 

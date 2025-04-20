@@ -24,6 +24,8 @@ dataloader:
   batch_size: 16 # 128
   num_workers: 12
 
+# Pretrained model parameters
+ckpt_name: 'logs/checkpoints/last.ckpt'
 dataset: humanml3d # kitml
 run_dir: pretrained_models/mdm-smpl_clip_smplrifke_humanml3d
 input_type: auto # timeline / text
@@ -37,17 +39,15 @@ overlap_s: 0.5
 ckpt: last
 device: cuda
 value_from: smpl
-####################ROBA CHE ERA NEL ARGPARSE
+
+
 # General parameters
 num_gen_per_prompt: 4
-#generated_dataset_size: 256
 num_prompts_dataset: 32
 num_workers: 6
-#generation_iter: {generated_dataset_size} // ({num_examples} * {num_prompts_dataset})
-#generation_iter = c.generated_dataset_size // (c.num_gen_per_prompt * c.num_prompts_dataset)
 
 # Training parameters
-iterations: 700
+iterations: 1000
 train_epochs: 4
 train_batch_size: 48
 grad_clip: 1.0
@@ -79,12 +79,12 @@ val_iter: 25
 val_batch_size: 16
 val_num_batch: 4
 
-# Pretrained model parameters
-#run_dir: 'pretrained_models/mdm-smpl_clip_smplrifke_humanml3d'
-ckpt_name: 'logs/checkpoints/last.ckpt'
-
 dataset_name: ''
 
+#Layer freeze
+freeze_normalization_layers: true
+
+#LorA
 lora: false
 lora_rank: 4
 lora_alpha: 16
