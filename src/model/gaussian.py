@@ -277,7 +277,8 @@ class GaussianDiffusion(DiffuserBase):
         return x_out, xstart, mean, sigma
 
 
-    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None, A=None):
+    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,A=None):
+
         device = self.device
 
         if A is None:
@@ -298,7 +299,7 @@ class GaussianDiffusion(DiffuserBase):
             nfeats = self.denoiser.nfeats
 
             shape = bs, duration, nfeats
-            xt = torch.randn(shape, device=device)
+            xt = masked(torch.randn(shape, device=device), mask)
 
             # iterator = range(self.timesteps - 1, -1, -1)
 
@@ -310,7 +311,11 @@ class GaussianDiffusion(DiffuserBase):
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
 
-                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
+                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+
+                x_start = masked(x_start, mask)
+                xt = masked(xt, mask)
+
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_prob = log_likelihood.mean(dim=[1, 2])
 
@@ -340,7 +345,9 @@ class GaussianDiffusion(DiffuserBase):
             return x_start, results
 
         else:
+
             xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
+            xt_pred = masked(xt_pred, y["mask"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_probs = log_likelihood.mean(dim=[1, 2])
 
