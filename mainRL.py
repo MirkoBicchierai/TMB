@@ -700,6 +700,7 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
+
     train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "train")
     val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
     test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
