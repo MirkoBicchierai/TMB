@@ -28,6 +28,13 @@ def masked(tensor, mask):
     tensor[~mask] = 0.0
     return tensor
 
+def nan_masked(tensor, mask):
+    if isinstance(tensor, list):
+        return [masked(t, mask) for t in tensor]
+    tensor[~mask] =  float('nan')
+    return tensor
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +324,8 @@ class GaussianDiffusion(DiffuserBase):
                 xt = masked(xt, mask)
 
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
-                log_prob = log_likelihood.mean(dim=[1, 2])
+                log_likelihood = nan_masked(log_likelihood, mask)
+                log_prob = log_likelihood.nanmean(dim=[1, 2])
 
                 results[diffusion_step] = {
 
@@ -349,6 +357,7 @@ class GaussianDiffusion(DiffuserBase):
             xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
             xt_pred = masked(xt_pred, y["mask"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
-            log_probs = log_likelihood.mean(dim=[1, 2])
+            log_likelihood = nan_masked(log_likelihood, y["mask"])
+            log_probs = log_likelihood.nanmean(dim=[1, 2])
 
             return log_probs, xt_pred
