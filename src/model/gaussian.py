@@ -28,6 +28,13 @@ def masked(tensor, mask):
     tensor[~mask] = 0.0
     return tensor
 
+def nan_masked(tensor, mask):
+    if isinstance(tensor, list):
+        return [masked(t, mask) for t in tensor]
+    tensor[~mask] =  float('nan')
+    return tensor
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -256,18 +263,18 @@ class GaussianDiffusion(DiffuserBase):
 
     def p_sample_2(self, xt, y, t, guidance_weight):
         # guided forward
-        output_cond = self.denoiser(xt, y, t)
+        output_cond = masked(self.denoiser(xt, y, t), y["mask"])
 
         if guidance_weight == 1.0:
             output = output_cond
         else:
             y_uncond = y.copy()
             y_uncond["tx"] = y_uncond["tx_uncond"]
-            output_uncond = self.denoiser(xt, y_uncond, t)
+            output_uncond = masked(self.denoiser(xt, y_uncond, t), y["mask"])
             output = output_uncond + guidance_weight * (output_cond - output_uncond)
 
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
-
+        mean = masked(mean, y["mask"])
         # empiricamnte va bene fino a 0.3 poi si rompe la generazione
         sigma = torch.max(sigma, torch.tensor(0.1))
 
@@ -277,7 +284,7 @@ class GaussianDiffusion(DiffuserBase):
         return x_out, xstart, mean, sigma
 
 
-    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,A=None):
+    def diffusionRL(self,tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,A=None):
 
         device = self.device
 
@@ -299,6 +306,7 @@ class GaussianDiffusion(DiffuserBase):
             nfeats = self.denoiser.nfeats
 
             shape = bs, duration, nfeats
+
             xt = masked(torch.randn(shape, device=device), mask)
 
             # iterator = range(self.timesteps - 1, -1, -1)
@@ -317,7 +325,8 @@ class GaussianDiffusion(DiffuserBase):
                 xt = masked(xt, mask)
 
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
-                log_prob = log_likelihood.mean(dim=[1, 2])
+                log_likelihood = nan_masked(log_likelihood, mask)
+                log_prob = log_likelihood.nanmean(dim=[1, 2])
 
                 results[diffusion_step] = {
 
@@ -349,6 +358,7 @@ class GaussianDiffusion(DiffuserBase):
             xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
             xt_pred = masked(xt_pred, y["mask"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
-            log_probs = log_likelihood.mean(dim=[1, 2])
+            log_likelihood = nan_masked(log_likelihood, y["mask"])
+            log_probs = log_likelihood.nanmean(dim=[1, 2])
 
             return log_probs, xt_pred

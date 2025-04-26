@@ -53,6 +53,7 @@ masking_ratio: 0.75
 reward_scale: 10
 
 # Sequence parameters
+sequence_fixed: true
 fps: 20
 time: 2.5
 joint_stype: "both"  # Can be either "both" or "smpljoints"

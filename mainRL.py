@@ -258,6 +258,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
     model.train()
 
     dataset = {
+
         "r": [],
         "xt_1": [],
         "xt": [],
@@ -285,7 +286,10 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         tx_emb, tx_emb_uncond = get_embeddings_2(text_model, batch, c.num_gen_per_prompt, device)
-        infos["all_lengths"] = batch["length"].repeat(c.num_gen_per_prompt)
+
+        if not c.sequence_fixed:
+            infos["all_lengths"] = batch["length"].repeat(c.num_gen_per_prompt)
+
         sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos)
 
         reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
@@ -554,7 +558,10 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
-            infos["all_lengths"] = batch["length"]
+
+            if not c.sequence_fixed:
+                infos["all_lengths"] = batch["length"]
+
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
 
             if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
@@ -706,16 +713,18 @@ def main(c: DictConfig):
     test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
 
     infos = {
-        #"all_lengths": torch.tensor(np.full(2048, int(c.time * c.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": c.fps,
         "guidance_weight": c.guidance_weight
     }
 
+    if c.sequence_fixed:
+        infos["all_lengths"] = torch.tensor(np.full(2048, int(c.time * c.fps))).to(device)
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=c.num_prompts_dataset,
-        shuffle=True,  # True
+        shuffle=True,
         drop_last=False,
         num_workers=c.num_workers,
         collate_fn=train_dataset.collate_fn
