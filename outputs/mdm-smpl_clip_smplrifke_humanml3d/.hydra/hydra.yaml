@@ -138,18 +138,18 @@ hydra:
   runtime:
     version: 1.3.2
     version_base: '1.3'
-    cwd: /home/mirko/PycharmProjects/Tesi Magistrale
+    cwd: /home/mbicchierai/Tesi Magistrale
     config_sources:
     - path: hydra.conf
       schema: pkg
       provider: hydra
-    - path: /home/mirko/PycharmProjects/Tesi Magistrale/configs
+    - path: /home/mbicchierai/Tesi Magistrale/configs
       schema: file
       provider: main
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /home/mirko/PycharmProjects/Tesi Magistrale/outputs/mdm-smpl_clip_smplrifke_humanml3d
+    output_dir: /home/mbicchierai/Tesi Magistrale/outputs/mdm-smpl_clip_smplrifke_humanml3d
     choices:
       motion_loader: smplrifke
       text_encoder: clip
