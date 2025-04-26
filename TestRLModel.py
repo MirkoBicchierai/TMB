@@ -16,6 +16,7 @@ from TMR.mtt.load_tmr_model import load_tmr_model_easy
 from src.tools.guofeats.motion_representation import joints_to_guofeats
 from TMR.src.guofeats import joints_to_guofeats
 from TMR.src.model.tmr import get_sim_matrix
+from peft import LoraModel, LoraConfig
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -102,7 +103,7 @@ def get_embeddings(text_model, batch, device):
 
 
 def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path):
-    out_formats = ['txt', 'videojoints', 'smpl', 'videosmpl']  # 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl'
+    out_formats = ['txt', 'videojoints', 'smpl']  # 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl'
     tmp = file_path
 
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
@@ -168,13 +169,15 @@ def test(model, dataloader, device, infos, text_model, smplh, args, joints_rende
             tmp_path = path + "batch_" + str(batch_idx) + "/"
             os.makedirs(tmp_path, exist_ok=True)
 
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, guidance_weight=args.guidance_weight_valid)
-            render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path)
+            infos["all_lengths"] = batch["length"]
+
+            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
+            if batch_idx == 0:
+                render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path)
+
             _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], args)  # shape [batch_size]
             total_tmr += tmr.sum().item()
             batch_count_tmr += tmr.shape[0]
-
-        break
 
     avg_tmr = total_tmr / batch_count_tmr
 
@@ -231,15 +234,40 @@ def main(c: DictConfig):
     cfg.diffusion.text_normalizer.base_dir = os.path.join(normalizer_dir, "text_stats")
 
     diffusion_rl = instantiate(cfg.diffusion)
+    """
+    lora_config = LoraConfig(
+        r=c.lora_rank,
+        lora_alpha=c.lora_alpha,
+        target_modules=[
+            "to_skel_layer",
+            "skel_embedding",
+            "tx_embedding.0",
+            "tx_embedding.2",
+            "seqTransEncoder.layers.0.self_attn.out_proj",
+            "seqTransEncoder.layers.1.self_attn.out_proj",
+            "seqTransEncoder.layers.2.self_attn.out_proj",
+            "seqTransEncoder.layers.3.self_attn.out_proj",
+            "seqTransEncoder.layers.4.self_attn.out_proj",
+            "seqTransEncoder.layers.5.self_attn.out_proj",
+            "seqTransEncoder.layers.6.self_attn.out_proj",
+            "seqTransEncoder.layers.7.self_attn.out_proj",
+        ],
+        lora_dropout=c.lora_dropout,
+        bias=c.lora_bias,
+    )
+    
+    # Apply LoRA configuration to the model first
+    diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
+    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_1325_PRADA.pth'))
+    """
 
-    #diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_75_GODLIKE.pth'))
 
     ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
     diffusion_rl.load_state_dict(ckpt["state_dict"])
 
     diffusion_rl = diffusion_rl.to(device)
 
-    val_dataset = instantiate(cfg.data, split="val")
+    val_dataset = instantiate(cfg.data, split="short_val")
 
     val_dataloader = DataLoader(
         val_dataset,
@@ -252,10 +280,10 @@ def main(c: DictConfig):
     )
 
     infos = {
-        "all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
+        #"all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": args.fps,
-        "guidance_weight": c.guidance
+        "guidance_weight": args.guidance_weight_valid
     }
 
     avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer)
