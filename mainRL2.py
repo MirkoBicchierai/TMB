@@ -20,6 +20,7 @@ from src.tools.guofeats.motion_representation import joints_to_guofeats
 from TMR.src.guofeats import joints_to_guofeats
 from TMR.src.model.tmr import get_sim_matrix
 from peft import LoraModel, LoraConfig
+from motion_dataset.loader import MovementDataset, movment_collate_fn
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -32,6 +33,9 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
     tmp = file_path
 
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
+
+        if isinstance(length, torch.Tensor):
+            length = int(length.item())
 
         x_start = x_start[:length]
 
@@ -190,7 +194,8 @@ def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
     motions = []
     for idx in range(sequences.shape[0]):
         x_start = sequences[idx]
-        length = infos["all_lengths"][idx].item()
+        length = int(infos["all_lengths"][idx].item())
+
         x_start = x_start[:length]
         motions.append(x_start.detach().cpu())
 
@@ -707,10 +712,10 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
-
-    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "train")
-    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
-    test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
+    if False:
+        train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "train")
+        val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
+        test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
 
     infos = {
         "featsname": cfg.motion_features,
@@ -721,38 +726,52 @@ def main(c: DictConfig):
     if c.sequence_fixed:
         infos["all_lengths"] = torch.tensor(np.full(2048, int(c.time * c.fps))).to(device)
 
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=c.num_prompts_dataset,
-        shuffle=True,
-        drop_last=False,
-        num_workers=c.num_workers,
-        collate_fn=train_dataset.collate_fn
-    )
+    if False:
+        train_dataloader = DataLoader(
+            train_dataset,
+            batch_size=c.num_prompts_dataset,
+            shuffle=True,
+            drop_last=False,
+            num_workers=c.num_workers,
+            collate_fn=train_dataset.collate_fn
+        )
 
-    train_embedding_tmr = preload_tmr_text(train_dataloader)
+        train_embedding_tmr = preload_tmr_text(train_dataloader)
 
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=c.val_batch_size,
-        shuffle=False,
-        drop_last=False,
-        num_workers=c.num_workers,
-        collate_fn=val_dataset.collate_fn
-    )
+        val_dataloader = DataLoader(
+            val_dataset,
+            batch_size=c.val_batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=c.num_workers,
+            collate_fn=val_dataset.collate_fn
+        )
 
-    val_embedding_tmr = preload_tmr_text(val_dataloader)
+        val_embedding_tmr = preload_tmr_text(val_dataloader)
 
-    test_dataloader = DataLoader(
-        test_dataset,
-        batch_size=c.val_batch_size,
-        shuffle=False,
-        drop_last=False,
-        num_workers=c.num_workers,
-        collate_fn=test_dataset.collate_fn
-    )
+        test_dataloader = DataLoader(
+            test_dataset,
+            batch_size=c.val_batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=c.num_workers,
+            collate_fn=test_dataset.collate_fn
+        )
 
-    test_embedding_tmr = preload_tmr_text(val_dataloader)
+        test_embedding_tmr = preload_tmr_text(test_dataloader)
+
+    else:
+        train_dataset = MovementDataset('/home/mbicchierai/Tesi Magistrale/motion_dataset/motion_train.json')
+        train_dataloader = DataLoader(train_dataset, batch_size=c.num_prompts_dataset, shuffle=True, drop_last=False, num_workers=c.num_workers, collate_fn=movment_collate_fn)
+        train_embedding_tmr = None
+
+        val_dataset = MovementDataset('/home/mbicchierai/Tesi Magistrale/motion_dataset/motion_val.json')
+        val_dataloader = DataLoader(val_dataset, batch_size=c.val_batch_size, shuffle=False, drop_last=False, num_workers=c.num_workers, collate_fn=movment_collate_fn)
+        val_embedding_tmr = None
+
+        test_dataset = MovementDataset('/home/mbicchierai/Tesi Magistrale/motion_dataset/motion_test.json')
+        test_dataloader = DataLoader(test_dataset, batch_size=c.val_batch_size, shuffle=False, drop_last=False, num_workers=c.num_workers, collate_fn=movment_collate_fn)
+        test_embedding_tmr = None
 
     file_path = "ResultRL/VAL/"
     os.makedirs(file_path, exist_ok=True)

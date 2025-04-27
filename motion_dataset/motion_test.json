@@ -1,0 +1,1374 @@
+[
+  {
+    "prompt": "Walk forward for 1 meter, then move to the left for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        1
+      ],
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk right for 2 meters, then move to the left for 2 meters, subsequently, head ahead for 3 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "right",
+        2
+      ],
+      [
+        "left",
+        2
+      ],
+      [
+        "forward",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk to the left for 3 meters, then go right for 3 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "left",
+        3
+      ],
+      [
+        "right",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance to the left for 4 meters, next, go ahead for 1 meter",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        4
+      ],
+      [
+        "forward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk left for 5 meters, then proceed backward for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "left",
+        5
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed backward for 5 meters, next, go left for 1 meter",
+    "duration": 3,
+    "steps": [
+      [
+        "backward",
+        5
+      ],
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the left for 2 meters, subsequently, head to the right for 4 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance forward for 4 meters, then move ahead for 2 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move backward for 5 meters, then go to the right for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        5
+      ],
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk right for 5 meters, subsequently, head back for 2 meters, after that, go left for 5 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "right",
+        5
+      ],
+      [
+        "backward",
+        2
+      ],
+      [
+        "left",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the right for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head left for 1 meter",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed back for 5 meters, then go right for 1 meter, next, go right for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        5
+      ],
+      [
+        "right",
+        1
+      ],
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk left for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance left for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed ahead for 4 meters, then proceed left for 2 meters, then go ahead for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "left",
+        2
+      ],
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk back for 5 meters, after that, go right for 3 meters, then go back for 1 meter",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        5
+      ],
+      [
+        "right",
+        3
+      ],
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Head left for 1 meter, after that, go to the right for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        1
+      ],
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the right for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 5 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "right",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Head ahead for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 1 meter, after that, go to the right for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        1
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move left for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance left for 5 meters, subsequently, head forward for 4 meters, then move left for 1 meter",
+    "duration": 5,
+    "steps": [
+      [
+        "left",
+        5
+      ],
+      [
+        "forward",
+        4
+      ],
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed forward for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed left for 5 meters, then proceed to the right for 5 meters, after that, go backward for 2 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "left",
+        5
+      ],
+      [
+        "right",
+        5
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed back for 1 meter, next, go back for 4 meters, subsequently, head back for 5 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "backward",
+        1
+      ],
+      [
+        "backward",
+        4
+      ],
+      [
+        "backward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed ahead for 4 meters, subsequently, head ahead for 5 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed forward for 4 meters, subsequently, head right for 2 meters, then move to the left for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "right",
+        2
+      ],
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the left for 3 meters, then proceed backward for 2 meters, then move to the left for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "left",
+        3
+      ],
+      [
+        "backward",
+        2
+      ],
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 3 meters, after that, go back for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        3
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed back for 1 meter, next, go to the left for 2 meters, after that, go backward for 5 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        1
+      ],
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk to the right for 3 meters, then move back for 4 meters, after that, go backward for 4 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "right",
+        3
+      ],
+      [
+        "backward",
+        4
+      ],
+      [
+        "backward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed ahead for 5 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move back for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move left for 3 meters, subsequently, head backward for 1 meter",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        3
+      ],
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed right for 4 meters, then go right for 2 meters, then go forward for 5 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "right",
+        4
+      ],
+      [
+        "right",
+        2
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move backward for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the left for 1 meter, then proceed left for 5 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "left",
+        1
+      ],
+      [
+        "left",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed ahead for 5 meters, subsequently, head ahead for 5 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        5
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed to the right for 5 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "right",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance to the left for 2 meters, after that, go backward for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move ahead for 5 meters, then go to the right for 3 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        5
+      ],
+      [
+        "right",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed right for 2 meters, then move to the right for 4 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "right",
+        2
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the right for 1 meter, next, go right for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        1
+      ],
+      [
+        "right",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed backward for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "backward",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance right for 5 meters, subsequently, head left for 2 meters, subsequently, head back for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "right",
+        5
+      ],
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move ahead for 1 meter, after that, go forward for 5 meters, after that, go forward for 4 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        1
+      ],
+      [
+        "forward",
+        5
+      ],
+      [
+        "forward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk left for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed forward for 4 meters, subsequently, head to the right for 2 meters, after that, go right for 4 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "right",
+        2
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Head backward for 1 meter, then proceed to the right for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "backward",
+        1
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk ahead for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance forward for 5 meters, next, go to the right for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        5
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 4 meters, then move to the right for 1 meter, next, go ahead for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "right",
+        4
+      ],
+      [
+        "right",
+        1
+      ],
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Move backward for 4 meters, subsequently, head to the left for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        4
+      ],
+      [
+        "left",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance left for 2 meters, then proceed backward for 3 meters, after that, go to the left for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        3
+      ],
+      [
+        "left",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed back for 2 meters, then proceed forward for 5 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        2
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Head ahead for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head forward for 2 meters, after that, go back for 4 meters, then move to the left for 4 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        2
+      ],
+      [
+        "backward",
+        4
+      ],
+      [
+        "left",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move back for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 4 meters, after that, go right for 4 meters, next, go forward for 2 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "right",
+        4
+      ],
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance backward for 5 meters, then move ahead for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "backward",
+        5
+      ],
+      [
+        "forward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "right",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "forward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Move left for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Move left for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk to the left for 1 meter, then move to the right for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        1
+      ],
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed backward for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance left for 5 meters, then proceed backward for 2 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "left",
+        5
+      ],
+      [
+        "backward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk to the left for 4 meters, subsequently, head back for 5 meters, next, go to the left for 2 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "left",
+        4
+      ],
+      [
+        "backward",
+        5
+      ],
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed to the left for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed to the left for 2 meters, then go forward for 4 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "forward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 5 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Head back for 3 meters, then proceed ahead for 2 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "backward",
+        3
+      ],
+      [
+        "forward",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the left for 1 meter, after that, go to the right for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        1
+      ],
+      [
+        "right",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Head ahead for 4 meters, subsequently, head to the left for 3 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "left",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Head ahead for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk forward for 4 meters, subsequently, head to the left for 2 meters, next, go to the right for 1 meter",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "left",
+        2
+      ],
+      [
+        "right",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Head left for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance back for 4 meters, subsequently, head right for 2 meters",
+    "duration": 3,
+    "steps": [
+      [
+        "backward",
+        4
+      ],
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed forward for 5 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move backward for 4 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "backward",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance forward for 2 meters, next, go left for 4 meters, then move to the right for 4 meters",
+    "duration": 5,
+    "steps": [
+      [
+        "forward",
+        2
+      ],
+      [
+        "left",
+        4
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move forward for 4 meters, then proceed to the left for 5 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "left",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance left for 2 meters, subsequently, head left for 3 meters",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "left",
+        3
+      ]
+    ]
+  },
+  {
+    "prompt": "Head backward for 4 meters, then proceed to the left for 1 meter",
+    "duration": 2,
+    "steps": [
+      [
+        "backward",
+        4
+      ],
+      [
+        "left",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Advance ahead for 4 meters, next, go to the right for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "forward",
+        4
+      ],
+      [
+        "right",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed left for 2 meters, subsequently, head backward for 2 meters, next, go to the left for 4 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        2
+      ],
+      [
+        "left",
+        4
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the left for 2 meters, subsequently, head backward for 1 meter",
+    "duration": 2,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the right for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk backward for 1 meter",
+    "duration": 1,
+    "steps": [
+      [
+        "backward",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk left for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "left",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Head to the right for 1 meter, then proceed right for 5 meters, then go to the right for 1 meter",
+    "duration": 4,
+    "steps": [
+      [
+        "right",
+        1
+      ],
+      [
+        "right",
+        5
+      ],
+      [
+        "right",
+        1
+      ]
+    ]
+  },
+  {
+    "prompt": "Move left for 2 meters, next, go back for 5 meters, then proceed back for 5 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "left",
+        2
+      ],
+      [
+        "backward",
+        5
+      ],
+      [
+        "backward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Proceed right for 3 meters, next, go ahead for 5 meters",
+    "duration": 4,
+    "steps": [
+      [
+        "right",
+        3
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 2 meters",
+    "duration": 1,
+    "steps": [
+      [
+        "right",
+        2
+      ]
+    ]
+  },
+  {
+    "prompt": "Walk to the left for 4 meters, after that, go right for 4 meters, next, go right for 5 meters",
+    "duration": 6,
+    "steps": [
+      [
+        "left",
+        4
+      ],
+      [
+        "right",
+        4
+      ],
+      [
+        "right",
+        5
+      ]
+    ]
+  },
+  {
+    "prompt": "Move to the right for 5 meters, next, go ahead for 4 meters, then go ahead for 5 meters",
+    "duration": 7,
+    "steps": [
+      [
+        "right",
+        5
+      ],
+      [
+        "forward",
+        4
+      ],
+      [
+        "forward",
+        5
+      ]
+    ]
+  }
+]

@@ -23,6 +23,9 @@ def length_to_mask(length, device: torch.device = None) -> Tensor:
         length = torch.tensor(length, device=device)
 
     max_len = max(length)
+    if isinstance(max_len, torch.Tensor):
+        max_len = int(max_len.item())
+
     mask = torch.arange(max_len, device=device).expand(
         len(length), max_len
     ) < length.unsqueeze(1)

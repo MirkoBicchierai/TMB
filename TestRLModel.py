@@ -49,10 +49,8 @@ def calc_eval_stats(x, smplh):
     x_latents = tmr_forward(x_guofeats)  # tensor(N, 256)
     return x_latents
 
-
 def is_list_of_strings(var):
     return isinstance(var, list) and all(isinstance(item, str) for item in var)
-
 
 def print_matrix_nicely(matrix: np.ndarray):
     init(autoreset=True)
@@ -79,7 +77,7 @@ def tmr_reward_special(sequences, infos, smplh, texts, args):
 
     x_latents = calc_eval_stats(motions, smplh)
     sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
-    # print_matrix_nicely(sim_matrix)
+    #print_matrix_nicely(sim_matrix)
 
     sim_matrix = torch.tensor(sim_matrix)
     classic_tmr = sim_matrix.diagonal()
@@ -111,6 +109,7 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
 
         x_start = x_start[:length]
+
 
         extracted_output = extract_joints(
             x_start.detach().cpu(),
@@ -153,8 +152,8 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
             with open(path, "w") as file:
                 file.write(text)
 
-
 def test(model, dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer):
+
     model.eval()
     generate_bar = tqdm(dataloader, desc=f"[Validation/Test Generations]")
 
@@ -173,7 +172,7 @@ def test(model, dataloader, device, infos, text_model, smplh, args, joints_rende
             infos["all_lengths"] = batch["length"]
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
-            if False: #batch_idx == 0
+            if batch_idx == 0:
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path)
 
             _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], args)  # shape [batch_size]
@@ -184,29 +183,24 @@ def test(model, dataloader, device, infos, text_model, smplh, args, joints_rende
 
     return avg_tmr
 
-
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Training configuration parser")
 
     # Guidance Weight
-    parser.add_argument("--guidance_weight_valid", type=float, default=5.0,
-                        help="Guidance weight at test generation time")
+    parser.add_argument("--guidance_weight_valid", type=float, default=5.0, help="Guidance weight at test generation time")
 
     # sequence parameters
     parser.add_argument("--fps", type=int, default=20, help="Frames per second")
     parser.add_argument("--time", type=float, default=2.5, help="Duration in seconds")
-    parser.add_argument("--joint_stype", type=str, default="both", choices=["both", "smpljoints"],
-                        help="Joint style type")
+    parser.add_argument("--joint_stype", type=str, default="both", choices=["both", "smpljoints"], help="Joint style type")
 
     # Validation/Test parameters
     parser.add_argument("--val_iter", type=int, default=25, help="Validation iterations")
     parser.add_argument("--val_batch_size", type=int, default=16, help="Validation batch size")
-    parser.add_argument("--val_num_batch", type=int, default=1,
-                        help="Validation number of batch used (0 for all batch)")
+    parser.add_argument("--val_num_batch", type=int, default=1, help="Validation number of batch used (0 for all batch)")
 
     # pretrained model parameters
-    parser.add_argument("--run_dir", type=str, default='pretrained_models/mdm-smpl_clip_smplrifke_humanml3d',
-                        help="Run directory")
+    parser.add_argument("--run_dir", type=str, default='pretrained_models/mdm-smpl_clip_smplrifke_humanml3d', help="Run directory")
     parser.add_argument("--ckpt_name", type=str, default='logs/checkpoints/last.ckpt', help="Checkpoint file name")
 
     return parser.parse_args()
@@ -240,7 +234,7 @@ def main(c: DictConfig):
     cfg.diffusion.text_normalizer.base_dir = os.path.join(normalizer_dir, "text_stats")
 
     diffusion_rl = instantiate(cfg.diffusion)
-
+    """
     lora_config = LoraConfig(
         r=c.lora_rank,
         lora_alpha=c.lora_alpha,
@@ -261,21 +255,20 @@ def main(c: DictConfig):
         lora_dropout=c.lora_dropout,
         bias=c.lora_bias,
     )
-
+    
     # Apply LoRA configuration to the model first
     diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
-    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_2225.pth'))
+    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_1325_PRADA.pth'))
+    """
 
-    #ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
-    #diffusion_rl.load_state_dict(ckpt["state_dict"])
+
+    ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
+    diffusion_rl.load_state_dict(ckpt["state_dict"])
 
     diffusion_rl = diffusion_rl.to(device)
 
-    val_dataset = instantiate(cfg.data, split="short_test") # GUIDANCE 1 (short_train): 0.6716 NEW,
-                                                            # GUIDANCE 1 (short_test): 0.6082 NEW, 0.492 OLD
-                                                            # GUIDANCE 5 (short_test): 0.6065 NEW, 0.502 OLD
-                                                            # GUIDANCE 1 (short_val): 0.6748 NEW, 0.5575 OLD
-                                                            # GUIDANCE 5 (short_val): 0.6718 NEW, 0.5671 OLD
+    val_dataset = instantiate(cfg.data, split="short_val")
+
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=args.val_batch_size,
@@ -287,7 +280,7 @@ def main(c: DictConfig):
     )
 
     infos = {
-        # "all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
+        #"all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": args.fps,
         "guidance_weight": args.guidance_weight_valid
@@ -296,7 +289,6 @@ def main(c: DictConfig):
     avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer)
 
     print(avg_tmr)
-
 
 if __name__ == "__main__":
     main()

@@ -276,7 +276,7 @@ class GaussianDiffusion(DiffuserBase):
         mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
         mean = masked(mean, y["mask"])
         # empiricamnte va bene fino a 0.3 poi si rompe la generazione
-        sigma = torch.max(sigma, torch.tensor(0.1))
+        sigma = torch.max(sigma, torch.tensor(0.1, device=sigma.device))
 
         noise = torch.randn_like(mean)
         x_out = mean + sigma * noise
@@ -303,6 +303,10 @@ class GaussianDiffusion(DiffuserBase):
 
             bs = len(lengths)
             duration = max(lengths)
+
+            if isinstance(duration, torch.Tensor):
+                duration = int(duration.item())
+
             nfeats = self.denoiser.nfeats
 
             shape = bs, duration, nfeats
@@ -327,6 +331,7 @@ class GaussianDiffusion(DiffuserBase):
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_likelihood = nan_masked(log_likelihood, mask)
                 log_prob = log_likelihood.nanmean(dim=[1, 2])
+                log_prob = log_prob.nan_to_num(0.0)
 
                 results[diffusion_step] = {
 
@@ -360,5 +365,6 @@ class GaussianDiffusion(DiffuserBase):
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_likelihood = nan_masked(log_likelihood, y["mask"])
             log_probs = log_likelihood.nanmean(dim=[1, 2])
+            log_probs = log_probs.nan_to_num(0.0)
 
             return log_probs, xt_pred
