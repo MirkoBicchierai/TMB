@@ -56,10 +56,10 @@ def print_matrix_nicely(matrix: np.ndarray):
         print(line)
 
 
-def tmr_reward_special(sequences, infos, smplh, batch_texts, all_embedding_tmr, c):
+def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c):
 
-    texts_plus_plus = tmr_forward_plus_plus(batch_texts)
-    texts = tmr_forward(batch_texts)
+    texts_plus_plus = tmr_forward_plus_plus(real_texts)
+    texts = tmr_forward(real_texts)
 
     motions = []
     for idx in range(sequences.shape[0]):
@@ -85,13 +85,14 @@ def tmr_reward_special(sequences, infos, smplh, batch_texts, all_embedding_tmr, 
     sim_matrix_plus_plus = (sim_matrix_plus_plus + 1) / 2
     tmr_plus_plus = sim_matrix_plus_plus.diagonal()
 
-    metrics = {
-        "tmr":tmr,
-        "tmr++": tmr_plus_plus,
-        "reward": tmr_plus_plus * c.reward_scale if c.tmr_plus_plus else tmr * c.reward_scale
-    }
-
     if c.tmr_reward:
+
+        metrics = {
+            "tmr": tmr,
+            "tmr++": tmr_plus_plus,
+            "reward": tmr_plus_plus * c.reward_scale if c.tmr_plus_plus else tmr * c.reward_scale
+        }
+
         return metrics
     else:
 
