@@ -1,248 +1,23 @@
 import itertools
 import os
-import shutil
 import hydra
 import numpy as np
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from torch import nn
+from RL.reward_model import tmr_reward_special
 from src.tools.smpl_layer import SMPLH
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.config import read_config
-from src.tools.extract_joints import extract_joints
 from src.model.text_encoder import TextToEmb
 import wandb
-from colorama import Fore, Style, init
-from TMR.mtt.load_tmr_model import load_tmr_model_easy
-from src.tools.guofeats.motion_representation import joints_to_guofeats
-from TMR.src.guofeats import joints_to_guofeats
-from TMR.src.model.tmr import get_sim_matrix
 from peft import LoraModel, LoraConfig
+from RL.utils import render, get_embeddings, get_embeddings_2, freeze_normalization_layers, create_folder_results
+
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
-
-tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
-
-
-def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, ty_log, video_log=False):
-    out_formats = ['txt', 'smpl', 'videojoints']  # ['txt', 'smpl', 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl']
-    tmp = file_path
-
-    for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
-
-        x_start = x_start[:length]
-
-        extracted_output = extract_joints(
-            x_start.detach().cpu(),
-            infos["featsname"],
-            fps=infos["fps"],
-            value_from="smpl",
-            smpl_layer=smplh,
-        )
-
-        file_path = tmp + str(idx) + "/"
-        os.makedirs(file_path, exist_ok=True)
-
-        if "smpl" in out_formats:
-            path = file_path + str(idx) + "_smpl.npy"
-            np.save(path, x_start.detach().cpu())
-
-        if "joints" in out_formats:
-            path = file_path + str(idx) + "_joints.npy"
-            np.save(path, extracted_output["joints"])
-
-        if "vertices" in extracted_output and "vertices" in out_formats:
-            path = file_path + str(idx) + "_verts.npy"
-            np.save(path, extracted_output["vertices"])
-
-        if "smpldata" in extracted_output and "smpldata" in out_formats:
-            path = file_path + str(idx) + "_smpl.npz"
-            np.savez(path, **extracted_output["smpldata"])
-
-        if "videojoints" in out_formats:
-            video_path = file_path + str(idx) + "_joints.mp4"
-            joints_renderer(extracted_output["joints"], title="", output=video_path, canonicalize=False)
-            if video_log:
-                wandb.log({ty_log: {"Video-joints": wandb.Video(video_path, format="mp4", caption=text)}})
-
-        if "vertices" in extracted_output and "videosmpl" in out_formats:
-            print(f"SMPL rendering {idx}")
-            video_path = file_path + str(idx) + "_smpl.mp4"
-            smpl_renderer(extracted_output["vertices"], title="", output=video_path)
-
-        if "txt" in out_formats:
-            path = file_path + str(idx) + ".txt"
-            with open(path, "w") as file:
-                file.write(text)
-
-
-def get_embeddings(text_model, batch, device):
-    with torch.no_grad():
-        tx_emb = text_model(batch["text"])
-        tx_emb_uncond = text_model(["" for _ in batch["text"]])
-
-        if isinstance(tx_emb, torch.Tensor):
-            tx_emb = {
-                "x": tx_emb[:, None],
-                "length": torch.tensor([1 for _ in range(len(tx_emb))]).to(device),
-            }
-            tx_emb_uncond = {
-                "x": tx_emb_uncond[:, None],
-                "length": torch.tensor([1 for _ in range(len(tx_emb_uncond))]).to(device),
-            }
-    return tx_emb, tx_emb_uncond
-
-
-def get_embeddings_2(text_model, batch, n, device):
-    with torch.no_grad():
-        tx_emb = text_model(batch["text"])
-        tx_emb_uncond = text_model(["" for _ in batch["text"]])
-
-        if isinstance(tx_emb, torch.Tensor):
-            tx_emb = {
-                "x": tx_emb[:, None].repeat(n, 1, 1),
-                "length": torch.tensor([1 for _ in range(len(tx_emb) * n)]).to(device),
-            }
-            tx_emb_uncond = {
-                "x": tx_emb_uncond[:, None].repeat(n, 1, 1),
-                "length": torch.tensor([1 for _ in range(len(tx_emb_uncond) * n)]).to(device),
-            }
-    return tx_emb, tx_emb_uncond
-
-
-def stillness_reward(sequences, infos, smplh):
-    joint_positions = []
-    for idx in range(sequences.shape[0]):
-        x_start = sequences[idx]
-        length = infos["all_lengths"][idx].item()
-        x_start = x_start[:length]
-
-        output = extract_joints(
-            x_start.detach().cpu(),
-            'smplrifke',
-            fps=20,
-            value_from='smpl',
-            smpl_layer=smplh,
-        )
-
-        joints = torch.as_tensor(output["joints"])
-        joint_positions.append(joints)
-
-    joints = torch.stack(joint_positions)
-    dt = 1.0 / 200
-
-    velocities = torch.diff(joints, dim=1) / dt
-    velocity_loss = torch.mean(velocities.pow(2), dim=(1, 2, 3))
-
-    reward = velocity_loss
-    return - reward
-
-
-def smpl_to_guofeats(smpl, smplh):
-    guofeats = []
-    for i in smpl:
-        i_output = extract_joints(
-            i,
-            'smplrifke',
-            fps=20,
-            value_from='smpl',
-            smpl_layer=smplh,
-        )
-        i_joints = i_output["joints"]  # tensor(N, 22, 3)
-        # convert to guofeats, first, make sure to revert the axis, as guofeats have gravity axis in Y
-        x, y, z = i_joints.T
-        i_joints = np.stack((x, z, -y), axis=0).T
-        i_guofeats = joints_to_guofeats(i_joints)
-        guofeats.append(i_guofeats)
-
-    return guofeats
-
-
-def calc_eval_stats(x, smplh):
-    x_guofeats = smpl_to_guofeats(x, smplh)
-    x_latents = tmr_forward(x_guofeats)  # tensor(N, 256)
-    return x_latents
-
-
-def is_list_of_strings(var):
-    return isinstance(var, list) and all(isinstance(item, str) for item in var)
-
-
-def print_matrix_nicely(matrix: np.ndarray):
-    init(autoreset=True)
-    for row in matrix:
-        max_val = np.max(row)
-        line = ""
-        for val in row:
-            truncated = int(val * 1000) / 1000
-            formatted = f"{truncated:.3f}"
-            if val == max_val:
-                line += f"{Fore.GREEN}{formatted}{Style.RESET_ALL}  "
-            else:
-                line += f"{formatted}  "
-        print(line)
-
-
-def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
-    motions = []
-    for idx in range(sequences.shape[0]):
-        x_start = sequences[idx]
-        length = infos["all_lengths"][idx].item()
-        x_start = x_start[:length]
-        motions.append(x_start.detach().cpu())
-
-    x_latents = calc_eval_stats(motions, smplh)
-    sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
-    # print_matrix_nicely(sim_matrix)
-
-    sim_matrix = torch.tensor(sim_matrix)
-    sim_matrix = (sim_matrix + 1) / 2
-    classic_tmr = sim_matrix.diagonal()
-
-    if c.tmr_reward:
-        return classic_tmr * c.reward_scale, classic_tmr
-    else:
-
-        sim_matrix_tmp = get_sim_matrix(x_latents, all_embedding_tmr.detach().cpu().type(x_latents.dtype)).numpy()
-        # print_matrix_nicely(sim_matrix_tmp)
-
-        sim_matrix_tmp = (sim_matrix_tmp + 1) / 2
-        diagonal_values = sim_matrix.diagonal()
-
-        # Calculate similarity between texts and all_embedding_tmr and find the most similar embedding in all_embedding_tmr
-        text_to_all_sim = torch.matmul(texts.detach().cpu(), all_embedding_tmr.transpose(0, 1))
-
-        matching_indices = torch.argmax(text_to_all_sim, dim=1)
-
-        special = []
-        for i in range(sim_matrix_tmp.shape[0]):
-            # Get the index to exclude for this row
-            exclude_idx = matching_indices[i].item()
-            # Make a copy of the row and set the element to exclude to NaN
-            row_copy = sim_matrix_tmp[i].copy()
-            row_copy[exclude_idx] = np.nan
-            row_copy[row_copy>c.masking_ratio] = np.nan
-
-            """ 
-            num_elements = len(row_copy)
-            num_to_nan = int(num_elements * c.masking_ratio)
-            indices_to_nan = np.random.choice(num_elements, num_to_nan, replace=False)
-            row_copy[indices_to_nan] = np.nan
-            """
-
-            # Calculate mean without the excluded element
-            row_mean = np.nanmean(row_copy)
-            # Calculate special value for this row (real - mean of row of all emb)
-            special_value = diagonal_values[i] - row_mean
-            special.append(special_value)
-
-        special = torch.tensor(special)
-
-    return special * c.reward_scale, classic_tmr
-
 
 def preload_tmr_text(dataloader):
     all_embeddings = []
@@ -266,6 +41,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         "log_like": [],
 
         "tmr": [],
+        "tmr++": [],
 
         "mask": [],
         "length": [],
@@ -292,18 +68,18 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos)
 
-        reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
-                                         train_embedding_tmr, c)
+        metrics = tmr_reward_special(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)
 
-        batch_size = reward.shape[0]
+        batch_size = sequences.shape[0]
         seq_len = results_by_timestep[0]["xt_new"].shape[1]
 
         # Store text embeddings just once, with repeat handling during concatenation
         all_rewards = []
         all_tmr = []
+        all_tmr_plus_plus = []
         all_xt_new = []
         all_xt_old = []
         all_t = []
@@ -324,15 +100,17 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
             experiment = {k: v.detach().cpu() if isinstance(v, torch.Tensor) else v for k, v in experiment.items()}
 
             if t == 0:
-                all_rewards.append(reward.cpu())
-                all_tmr.append(tmr.cpu())
+                all_rewards.append(metrics["reward"].cpu())
+                all_tmr.append(metrics["tmr"].cpu())
+                all_tmr_plus_plus.append(metrics["tmr++"].cpu())
             else:
-                all_rewards.append(torch.zeros_like(reward).cpu())
-                all_tmr.append(torch.zeros_like(tmr).cpu())
+                all_rewards.append(torch.zeros_like(metrics["reward"]).cpu())
+                all_tmr.append(torch.zeros_like(metrics["tmr"]).cpu())
+                all_tmr_plus_plus.append(torch.zeros_like(metrics["tmr++"]).cpu())
 
             all_xt_new.append(experiment["xt_new"])
             all_xt_old.append(experiment["xt_old"])
-            all_t.append(torch.full((batch_size,), t, device=reward.device).cpu())
+            all_t.append(torch.full((batch_size,), t, device=metrics["reward"].device).cpu())
             all_log_probs.append(experiment["log_prob"])
 
             # y
@@ -348,6 +126,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         # Concatenate all the results for this batch
         dataset["r"].append(torch.cat(all_rewards, dim=0).view(diff_step, batch_size).T.clone())
         dataset["tmr"].append(torch.cat(all_tmr, dim=0).view(diff_step, batch_size).T.clone())
+        dataset["tmr++"].append(torch.cat(all_tmr_plus_plus, dim=0).view(diff_step, batch_size).T.clone())
         dataset["xt_1"].append(
             torch.cat(all_xt_new, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
         dataset["xt"].append(
@@ -432,8 +211,12 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
     mean_tmr = torch.mean(dataset["tmr"][mask], dim=0)
     std_tmr = torch.std(dataset["tmr"][mask], dim=0)
 
+    mean_tmr_plus_plus = torch.mean(dataset["tmr++"][mask], dim=0)
+    std_tmr_plus_plus = torch.std(dataset["tmr++"][mask], dim=0)
+
     wandb.log({"Train": {"Mean Reward": mean_r.item(), "Std Reward": std_r.item(), "Mean TMR": mean_tmr.item(),
-                         "Std TMR": std_tmr.item(), "iterations": iteration}})
+                         "Std TMR": std_tmr.item(), "Mean TMR++": mean_tmr_plus_plus.item(),
+                         "Std TMR++": std_tmr_plus_plus.item(), "iterations": iteration}})
 
     dataset["advantage"] = torch.zeros_like(dataset["r"])
     dataset["advantage"][mask] = (dataset["r"][mask] - mean_r) / (std_r + delta)
@@ -529,12 +312,11 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
                                  "policy_loss": epoch_policy_loss, "trigger-clip": clipping_percentage}})
 
 
-def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, all_embedding_tmr,
-         path):
+def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, all_embedding_tmr, path):
     os.makedirs(path, exist_ok=True)
+    out_formats = ['txt', 'smpl', 'joints', 'videojoints']
 
     ty_log = ""
-
     if "VAL" in path:
         ty_log = "Validation"
     else:
@@ -548,8 +330,8 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         generate_bar = tqdm(enumerate(itertools.islice(itertools.cycle(dataloader), c.val_num_batch)),
                             total=c.val_num_batch, leave=False, desc=f"[Validation/Test Generations]")
 
-    total_reward, total_tmr = 0, 0
-    batch_count_reward, batch_count_tmr = 0, 0
+    total_reward, total_tmr, total_tmr_plus_plus = 0, 0, 0
+    batch_count_reward, batch_count_tmr, batch_count_tmr_plus_plus = 0, 0, 0
 
     for batch_idx, batch in generate_bar:
         tmp_path = path + "batch_" + str(batch_idx) + "/"
@@ -564,53 +346,25 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
 
-            #if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
-            #    render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, video_log=True)
+            if ((ty_log == "Validation" and batch_idx == 0) or ty_log == "Test") and c.render_videos:
+               render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, out_formats, video_log=True)
 
-            reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr, c)  # shape [batch_size]
+            metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)  # shape [batch_size]
 
-            total_reward += reward.sum().item()
-            batch_count_reward += reward.shape[0]
+            total_reward += metrics["reward"].sum().item()
+            batch_count_reward += metrics["reward"].shape[0]
 
-            total_tmr += tmr.sum().item()
-            batch_count_tmr += tmr.shape[0]
+            total_tmr += metrics["tmr"].sum().item()
+            batch_count_tmr += metrics["tmr"].shape[0]
+
+            total_tmr_plus_plus += metrics["tmr++"].sum().item()
+            batch_count_tmr_plus_plus += metrics["tmr++"].shape[0]
 
     avg_reward = total_reward / batch_count_reward
     avg_tmr = total_tmr / batch_count_tmr
+    avg_tmr_plus_plus = total_tmr_plus_plus / batch_count_tmr_plus_plus
 
-    return avg_reward, avg_tmr
-
-
-def create_folder_results(name):
-    results_dir = name
-    os.makedirs(results_dir, exist_ok=True)
-
-    for item in os.listdir(results_dir):
-        item_path = os.path.join(results_dir, item)
-        if os.path.isfile(item_path):
-            os.remove(item_path)
-        elif os.path.isdir(item_path):
-            shutil.rmtree(item_path)
-
-
-def freeze_normalization_layers(model):
-    for param in model.denoiser.parameters():
-        param.requires_grad = True
-
-    for name, module in model.denoiser.named_modules():
-        if isinstance(module, (nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
-            for param in module.parameters():
-                param.requires_grad = False
-
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    frozen_params = total_params - trainable_params
-
-    print(f"Total parameters DENOISER MODEL: {total_params}")
-    print(
-        f"Trainable parameters of DENOISER MODEL after freeze normalization layers: {trainable_params} ({trainable_params / total_params:.2%})")
-    print(f"Frozen parameters after freeze normalization layers: {frozen_params} ({frozen_params / total_params:.2%})")
-
+    return avg_reward, avg_tmr, avg_tmr_plus_plus
 
 @hydra.main(config_path="configs", config_name="TrainRL", version_base="1.3")
 def main(c: DictConfig):
@@ -763,9 +517,8 @@ def main(c: DictConfig):
         optimizer = torch.optim.AdamW(diffusion_rl.parameters(), lr=c.lr, betas=(c.beta1, c.beta2), eps=c.eps,
                                       weight_decay=c.weight_decay)
 
-    avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
-                               smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/OLD/")
-    wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": 0}})
+    avg_reward, avg_tmr, avg_tmr_plus_plus = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/OLD/")
+    wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "iterations": 0}})
 
     iter_bar = tqdm(range(c.iterations), desc="Iterations", total=c.iterations)
     for iteration in iter_bar:
@@ -775,16 +528,16 @@ def main(c: DictConfig):
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_old)
 
         if (iteration + 1) % c.val_iter == 0:
-            avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
+            avg_reward, avg_tmr, avg_tmr_plus_plus = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
                                        smpl_renderer, c, val_embedding_tmr,
                                        path="ResultRL/VAL/" + str(iteration + 1) + "/")
-            wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "iterations": iteration + 1}})
+            wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "iterations": iteration + 1}})
             torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
             iter_bar.set_postfix(val_tmr=f"{avg_tmr:.4f}")
 
-    avg_reward, avg_tmr = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer,
+    avg_reward, avg_tmr, avg_tmr_plus_plus = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer,
                                smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
-    wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr}})
+    wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus}})
 
     torch.save(diffusion_rl.state_dict(), 'RL_Model/model_final.pth')
 

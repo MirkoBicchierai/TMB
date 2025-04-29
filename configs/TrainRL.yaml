@@ -49,6 +49,8 @@ advantage_clip_epsilon: 1e-4
 
 # Reward Model
 tmr_reward: true
+tmr_plus_plus: true
+
 masking_ratio: 0.75
 reward_scale: 10
 
@@ -73,6 +75,7 @@ alphaL: 1
 val_iter: 25
 val_batch_size: 16
 val_num_batch: 4
+render_videos: false
 
 dataset_name: ''
 

@@ -5,6 +5,7 @@ import hydra
 import numpy as np
 import torch
 from hydra.utils import instantiate
+from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from src.tools.smpl_layer import SMPLH
@@ -26,6 +27,61 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
+
+
+def render_swag(x_starts, infos, smplh, texts):
+
+    trans = []
+    for idx, (x_start, length) in enumerate(zip(x_starts, infos["all_lengths"])):
+
+        if isinstance(length, torch.Tensor):
+            length = int(length.item())
+
+        x_start = x_start[:length]
+
+        extracted_output = extract_joints(
+            x_start.detach().cpu(),
+            infos["featsname"],
+            fps=infos["fps"],
+            value_from="smpl",
+            smpl_layer=smplh,
+        )
+
+        x, y, z = 0, 1, 2
+        trajectory = extracted_output["joints"][:, 0, [x, y]]
+
+        # Subtract the starting point (first value) from all points in the trajectory
+        trajectory = trajectory - trajectory[0]
+
+
+        # cmap = plt.get_cmap('coolwarm')
+        #
+        # # Normalize the data to [0, 1] range for coloring
+        # norm = plt.Normalize(vmin=0, vmax=len(trajectory) - 1)
+        #
+        # # Plotting the trajectory with colors from red to blue
+        # plt.figure(figsize=(8, 6))
+        #
+        # # Scatter plot for each point in the trajectory, coloring based on position
+        # plt.scatter(trajectory[:, 0], trajectory[:, 1], c=np.arange(len(trajectory)), cmap=cmap, norm=norm, marker='o')
+        #
+        # # Add labels and title
+        # plt.title('Trajectory in XY plane')
+        # plt.xlabel('X coordinate')
+        # plt.ylabel('Y coordinate')
+        #
+        # # Optional: Color bar to show the mapping of the points to the color scale
+        # plt.colorbar(label='Index along trajectory')
+        #
+        # # Grid and legend
+        # plt.grid(True)
+        #
+        # # Save the figure
+        # plt.savefig(f"aua/sus_{idx}.png")
+
+        trans.append(trajectory)
+
+    return trans
 
 
 def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, ty_log, video_log=False):
@@ -189,6 +245,52 @@ def print_matrix_nicely(matrix: np.ndarray):
                 line += f"{formatted}  "
         print(line)
 
+def make_reference_path(steps, N):
+    """
+    steps = [(dir1, dist1), (dir2, dist2), …]
+       dir = 2-vector unit direction,
+       dist = length in metres
+    N = number of frames
+    """
+
+    # 1) build corner points
+    P = [np.zeros(2)]
+    for d,ℓ in steps:
+        P.append(P[-1] + d*ℓ)
+    # 2) linearly interpolate P to N samples
+    cumlen = np.cumsum([0] + [np.linalg.norm(P[i+1]-P[i]) for i in range(len(P)-1)])
+    u = np.linspace(0, cumlen[-1], N)
+    pts = []
+    for ui in u:
+        # find segment
+        k = np.searchsorted(cumlen, ui) - 1
+        t = (ui - cumlen[k]) / (cumlen[k+1] - cumlen[k])
+        pts.append((1-t)*P[k] + t*P[k+1])
+    return np.vstack(pts)  # shape (N,2)
+
+def replace_first_with_direction(tup):
+    direction_map = {
+        '0': np.array([0, 0.2]),
+        '1': np.array([0, -0.2]),
+        '2': np.array([-0.2, 0]),
+        '3': np.array([0.2, 0])
+    }
+    direction_tensor, second_value_tensor = tup
+    direction_key = str(direction_tensor.item())
+    direction_vector = direction_map.get(direction_key, np.array([0, 0]))  # Default to [0, 0]
+    return (direction_vector, second_value_tensor.cpu().numpy())
+
+
+def path_reward(Q, steps, α=5.0):
+
+    # Apply the function using map
+    steps = list(map(replace_first_with_direction, steps))
+
+    N = len(Q)
+    P = make_reference_path(steps, N)
+    errs = np.linalg.norm(Q - P, axis=1)
+    E_rms = np.sqrt(np.mean(errs**2))
+    return np.exp(-α*E_rms)
 
 def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
     motions = []
@@ -299,6 +401,17 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
                                          train_embedding_tmr, c)
+
+        Q = render_swag(sequences, infos, smplh, batch["text"])
+        lesghere = []
+        batch["directions"] = batch["directions"].repeat(c.num_gen_per_prompt,1)
+        batch["distances"] = batch["distances"].repeat(c.num_gen_per_prompt,1)
+        for stronzo in range(len(Q)):
+            r = path_reward(Q[stronzo], list(zip(batch["directions"][stronzo], batch["distances"][stronzo])))
+            lesghere.append(r)
+
+        alpha = 0.00
+        reward = alpha * reward + torch.Tensor(lesghere, device=reward.device) * 10
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)
@@ -575,6 +688,16 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
                                              c)  # shape [batch_size]
+
+            Q = render_swag(sequences, infos, smplh, batch["text"])
+
+            lesghere = []
+            for stronzo in range(len(Q)):
+                r = path_reward(Q[stronzo],list(zip(batch["directions"][stronzo], batch["distances"][stronzo])))
+                lesghere.append(r)
+
+            alpha = 0.00
+            reward = alpha*reward + torch.Tensor(lesghere, device=reward.device)
 
             total_reward += reward.sum().item()
             batch_count_reward += reward.shape[0]
