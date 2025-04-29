@@ -17,6 +17,7 @@ from src.tools.guofeats.motion_representation import joints_to_guofeats
 from TMR.src.guofeats import joints_to_guofeats
 from TMR.src.model.tmr import get_sim_matrix
 from peft import LoraModel, LoraConfig
+import pytorch_lightning as pl
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -35,10 +36,10 @@ def smpl_to_guofeats(smpl, smplh):
             smpl_layer=smplh,
         )
         i_joints = i_output["joints"]  # tensor(N, 22, 3)
-        # convert to guofeats, first, make sure to revert the axis, as guofeats have gravity axis in Y
+        # convert to guofeats, first, make sure to revert the axis, as guofeats have gravity axis in Y\
         x, y, z = i_joints.T
-        i_joints = np.stack((x, z, -y), axis=0).T
-        i_guofeats = joints_to_guofeats(i_joints)
+        i_joints_flipped = np.stack((x, z, -y), axis=0).T
+        i_guofeats = joints_to_guofeats(i_joints_flipped)
         guofeats.append(i_guofeats)
 
     return guofeats
@@ -49,8 +50,10 @@ def calc_eval_stats(x, smplh):
     x_latents = tmr_forward(x_guofeats)  # tensor(N, 256)
     return x_latents
 
+
 def is_list_of_strings(var):
     return isinstance(var, list) and all(isinstance(item, str) for item in var)
+
 
 def print_matrix_nicely(matrix: np.ndarray):
     init(autoreset=True)
@@ -77,28 +80,29 @@ def tmr_reward_special(sequences, infos, smplh, texts, args):
 
     x_latents = calc_eval_stats(motions, smplh)
     sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
-    #print_matrix_nicely(sim_matrix)
+    # print_matrix_nicely(sim_matrix)
 
     sim_matrix = torch.tensor(sim_matrix)
     classic_tmr = sim_matrix.diagonal()
 
-    return classic_tmr * 10, classic_tmr
+    return classic_tmr * 10, (classic_tmr + 1) / 2
 
 
 def get_embeddings(text_model, batch, device):
     with torch.no_grad():
         tx_emb = text_model(batch["text"])
         tx_emb_uncond = text_model(["" for _ in batch["text"]])
-
         if isinstance(tx_emb, torch.Tensor):
             tx_emb = {
                 "x": tx_emb[:, None],
                 "length": torch.tensor([1 for _ in range(len(tx_emb))]).to(device),
             }
+
             tx_emb_uncond = {
                 "x": tx_emb_uncond[:, None],
                 "length": torch.tensor([1 for _ in range(len(tx_emb_uncond))]).to(device),
             }
+
     return tx_emb, tx_emb_uncond
 
 
@@ -109,7 +113,6 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
     for idx, (x_start, length, text) in enumerate(zip(x_starts, infos["all_lengths"], texts)):
 
         x_start = x_start[:length]
-
 
         extracted_output = extract_joints(
             x_start.detach().cpu(),
@@ -152,8 +155,8 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
             with open(path, "w") as file:
                 file.write(text)
 
-def test(model, dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer):
 
+def test(model, dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer):
     model.eval()
     generate_bar = tqdm(dataloader, desc=f"[Validation/Test Generations]")
 
@@ -172,10 +175,15 @@ def test(model, dataloader, device, infos, text_model, smplh, args, joints_rende
             infos["all_lengths"] = batch["length"]
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
-            if batch_idx == 0:
+            if batch_idx == 0 and False:
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path)
 
+            # batch["tmr_text"] = tmr_forward(batch["text"])
+
             _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], args)  # shape [batch_size]
+            # con sequences = 0.48936178562414906
+            # _, tmr = tmr_reward_special(batch["x"], infos, smplh, batch["tmr_text"], args)  # shape [batch_size]
+
             total_tmr += tmr.sum().item()
             batch_count_tmr += tmr.shape[0]
 
@@ -183,11 +191,9 @@ def test(model, dataloader, device, infos, text_model, smplh, args, joints_rende
 
     return avg_tmr
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Training configuration parser")
-
-    # Guidance Weight
-    parser.add_argument("--guidance_weight_valid", type=float, default=5.0, help="Guidance weight at test generation time")
 
     # sequence parameters
     parser.add_argument("--fps", type=int, default=20, help="Frames per second")
@@ -196,11 +202,12 @@ def parse_arguments():
 
     # Validation/Test parameters
     parser.add_argument("--val_iter", type=int, default=25, help="Validation iterations")
-    parser.add_argument("--val_batch_size", type=int, default=16, help="Validation batch size")
+    parser.add_argument("--val_batch_size", type=int, default=256, help="Validation batch size")
     parser.add_argument("--val_num_batch", type=int, default=1, help="Validation number of batch used (0 for all batch)")
 
     # pretrained model parameters
     parser.add_argument("--run_dir", type=str, default='pretrained_models/mdm-smpl_clip_smplrifke_humanml3d', help="Run directory")
+
     parser.add_argument("--ckpt_name", type=str, default='logs/checkpoints/last.ckpt', help="Checkpoint file name")
 
     return parser.parse_args()
@@ -211,6 +218,7 @@ def main(c: DictConfig):
     args = parse_arguments()
 
     cfg = read_config(args.run_dir)
+    pl.seed_everything(1534)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -234,7 +242,9 @@ def main(c: DictConfig):
     cfg.diffusion.text_normalizer.base_dir = os.path.join(normalizer_dir, "text_stats")
 
     diffusion_rl = instantiate(cfg.diffusion)
+
     """
+
     lora_config = LoraConfig(
         r=c.lora_rank,
         lora_alpha=c.lora_alpha,
@@ -255,40 +265,46 @@ def main(c: DictConfig):
         lora_dropout=c.lora_dropout,
         bias=c.lora_bias,
     )
-    
+
     # Apply LoRA configuration to the model first
     diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
     diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_1325_PRADA.pth'))
-    """
 
+    """
 
     ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
     diffusion_rl.load_state_dict(ckpt["state_dict"])
 
     diffusion_rl = diffusion_rl.to(device)
+    val_dataset = instantiate(cfg.data, split="test")
 
-    val_dataset = instantiate(cfg.data, split="short_val")
-
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=args.val_batch_size,
-        shuffle=False,
-        drop_last=False,
-        pin_memory=True,
-        num_workers=12,
-        collate_fn=val_dataset.collate_fn
-    )
+    val_dataloader = DataLoader(val_dataset,
+                                batch_size=args.val_batch_size,
+                                shuffle=False,
+                                drop_last=False,
+                                pin_memory=True,
+                                num_workers=12,
+                                collate_fn=val_dataset.collate_fn
+                                )
 
     infos = {
-        #"all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
+        # "all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": args.fps,
-        "guidance_weight": args.guidance_weight_valid
+        "guidance_weight": 1.0
     }
 
     avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer)
-
     print(avg_tmr)
+
+    # tmr_forward = load_tmr_model_easy(device="cpu", dataset="humanml3d")
+    # GUIDANCE 7: OLD-0.801, NEW- 0.786
+    # GUIDANCE 1: OLD-0.737 , NEW- 0.7187
+
+    # tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
+    # GUIDANCE 7: OLD - 0.753, NEW - 0.743
+    # GUIDANCE 1: OLD - 0.695, NEW - 0.732
+
 
 if __name__ == "__main__":
     main()

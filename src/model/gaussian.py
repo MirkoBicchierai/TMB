@@ -284,7 +284,7 @@ class GaussianDiffusion(DiffuserBase):
         return x_out, xstart, mean, sigma
 
 
-    def diffusionRL(self,tx_emb=None, tx_emb_uncond=None, infos=None, guidance_weight=1.0, y=None, t=None, xt=None,A=None):
+    def diffusionRL(self,tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None,A=None):
 
         device = self.device
 
@@ -323,7 +323,7 @@ class GaussianDiffusion(DiffuserBase):
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
 
-                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, guidance_weight)
+                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
 
                 x_start = masked(x_start, mask)
                 xt = masked(xt, mask)
@@ -331,7 +331,7 @@ class GaussianDiffusion(DiffuserBase):
                 log_likelihood = self.log_likelihood(xt, mean, sigma)
                 log_likelihood = nan_masked(log_likelihood, mask)
                 log_prob = log_likelihood.nanmean(dim=[1, 2])
-                log_prob = log_prob.nan_to_num(0.0)
+                #log_prob = log_prob.nan_to_num(0.0)
 
                 results[diffusion_step] = {
 
@@ -365,6 +365,6 @@ class GaussianDiffusion(DiffuserBase):
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_likelihood = nan_masked(log_likelihood, y["mask"])
             log_probs = log_likelihood.nanmean(dim=[1, 2])
-            log_probs = log_probs.nan_to_num(0.0)
+            #log_probs = log_probs.nan_to_num(0.0)
 
             return log_probs, xt_pred

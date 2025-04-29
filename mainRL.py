@@ -199,6 +199,7 @@ def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
     # print_matrix_nicely(sim_matrix)
 
     sim_matrix = torch.tensor(sim_matrix)
+    sim_matrix = (sim_matrix + 1) / 2
     classic_tmr = sim_matrix.diagonal()
 
     if c.tmr_reward:
@@ -209,7 +210,6 @@ def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
         # print_matrix_nicely(sim_matrix_tmp)
 
         sim_matrix_tmp = (sim_matrix_tmp + 1) / 2
-        sim_matrix = (sim_matrix + 1) / 2
         diagonal_values = sim_matrix.diagonal()
 
         # Calculate similarity between texts and all_embedding_tmr and find the most similar embedding in all_embedding_tmr
@@ -424,7 +424,7 @@ def prepare_dataset(dataset):
 
 def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None):
     model.train()
-    delta = 1e-5
+    delta = 1e-7
     mask = dataset["r"] != 0
     mean_r = torch.mean(dataset["r"][mask], dim=0)
     std_r = torch.std(dataset["r"][mask], dim=0)
@@ -543,7 +543,7 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
     model.eval()
 
     if c.val_num_batch == 0:
-        generate_bar = tqdm(enumerate(dataloader), leave=False, desc=f"[Validation/Test Generations]")
+        generate_bar = tqdm(enumerate(dataloader), leave=False, desc=f"[Validation/Test Generations]", total=len(dataloader))
     else:
         generate_bar = tqdm(enumerate(itertools.islice(itertools.cycle(dataloader), c.val_num_batch)),
                             total=c.val_num_batch, leave=False, desc=f"[Validation/Test Generations]")
@@ -564,12 +564,10 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
 
-            if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
-                render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
-                       video_log=True)
+            #if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
+            #    render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, video_log=True)
 
-            reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
-                                             c)  # shape [batch_size]
+            reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr, c)  # shape [batch_size]
 
             total_reward += reward.sum().item()
             batch_count_reward += reward.shape[0]
