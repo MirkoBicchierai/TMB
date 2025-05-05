@@ -51,6 +51,7 @@ class MatplotlibRender:
         highlights=None,
         title: str = "",
         canonicalize=None,
+        p=None
     ):
         canonicalize = canonicalize if canonicalize is not None else self.canonicalize
         fps = fps if fps is not None else self.fps
@@ -69,6 +70,7 @@ class MatplotlibRender:
             figsize=(self.figsize, self.figsize),
             fontsize=self.fontsize,
             canonicalize=canonicalize,
+            p=p
         )
 
 
@@ -147,6 +149,7 @@ def render_animation(
     fontsize: int = 15,
     canonicalize: bool = False,
     agg=True,
+    p=None
 ):
     if agg:
         import matplotlib
@@ -193,6 +196,24 @@ def render_animation(
     minx, miny, _ = joints.min(axis=(0, 1))
     maxx, maxy, _ = joints.max(axis=(0, 1))
     plot_floor(ax, minx, maxx, miny, maxy, 0)
+
+    if p is not None:
+        px, py = p.detach().cpu().numpy()
+        ax.scatter(
+            px, py, 0,
+            color="red",  # pick any color you like
+            marker="o",  # or "x", "^", etc.
+            s=60,  # marker size
+            zorder=30,  # draw on top
+            depthshade=True
+        )
+        ax.text(
+            px, py, 0,
+            f"x: {px:.2f} y: {py:.2f}",  # label
+            color="red",
+            fontsize=fontsize,
+            zorder=31
+        )
 
     # Put the character on the floor
     height_offset = np.min(joints[:, :, z])  # Min height

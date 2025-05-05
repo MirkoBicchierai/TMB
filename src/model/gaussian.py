@@ -1,16 +1,9 @@
-import copy
 import logging
 from collections import defaultdict
-from matplotlib.pyplot import barbs
 from tqdm import tqdm
 import torch
 from .diffusion_base import DiffuserBase
 from ..data.collate import length_to_mask, collate_tensor_with_padding
-from src.stmc import combine_features_intervals, interpolate_intervals, bada_bim_core
-import numpy as np
-import os
-import itertools
-from src.tools.extract_joints import extract_joints
 from src.tools.smpl_layer import SMPLH
 
 smplh = SMPLH(
@@ -263,7 +256,9 @@ class GaussianDiffusion(DiffuserBase):
 
     def p_sample_2(self, xt, y, t, guidance_weight):
         # guided forward
+
         output_cond = masked(self.denoiser(xt, y, t), y["mask"])
+
 
         if guidance_weight == 1.0:
             output = output_cond
@@ -283,8 +278,30 @@ class GaussianDiffusion(DiffuserBase):
         xstart = output
         return x_out, xstart, mean, sigma
 
+    def p_sample_3(self, xt, y, t, guidance_weight, p):
+        # guided forward
 
-    def diffusionRL(self,tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None,A=None):
+        output_cond = masked(self.denoiser(xt, y, p, t), y["mask"])
+
+        if guidance_weight == 1.0:
+            output = output_cond
+        else:
+            y_uncond = y.copy()
+            y_uncond["tx"] = y_uncond["tx_uncond"]
+            output_uncond = masked(self.denoiser(xt, y_uncond, t), y["mask"])
+            output = output_uncond + guidance_weight * (output_cond - output_uncond)
+
+        mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
+        mean = masked(mean, y["mask"])
+        # empiricamnte va bene fino a 0.3 poi si rompe la generazione
+        sigma = torch.max(sigma, torch.tensor(0.1, device=sigma.device))
+
+        noise = torch.randn_like(mean)
+        x_out = mean + sigma * noise
+        xstart = output
+        return x_out, xstart, mean, sigma
+
+    def diffusionRL(self, tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None,A=None, p=None):
 
         device = self.device
 
@@ -323,7 +340,7 @@ class GaussianDiffusion(DiffuserBase):
                 t = torch.full((bs,), diffusion_step, device=device)
                 xt_old = xt.clone()
 
-                xt, x_start, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
+                xt, x_start, mean, sigma = self.p_sample_3(xt, y, t, infos["guidance_weight"], p=p)
 
                 x_start = masked(x_start, mask)
                 xt = masked(xt, mask)
@@ -339,6 +356,7 @@ class GaussianDiffusion(DiffuserBase):
                     "xt_old": xt_old.detach().cpu(),  # begin the xt
                     "xt_new": xt.clone().detach().cpu(),  # begin the A when train PPO
                     "log_prob": log_prob.detach().cpu(),
+                    "positions": p.detach().cpu(),
 
                     "length": lengths.detach().cpu(),
                     "mask": mask.detach().cpu(),
@@ -360,7 +378,7 @@ class GaussianDiffusion(DiffuserBase):
 
         else:
 
-            xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
+            xt_pred, _, mean, sigma = self.p_sample_3(xt, y, t, infos["guidance_weight"], p=p)
             xt_pred = masked(xt_pred, y["mask"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_likelihood = nan_masked(log_likelihood, y["mask"])
