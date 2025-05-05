@@ -535,8 +535,8 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
                                                            p=batch["positions"])
         #
-        # reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
-        #                                  train_embedding_tmr, c)
+        _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
+                                         train_embedding_tmr, c)
 
         # Q = render_swag(sequences, infos, smplh, batch["text"])
         # lesghere = []
@@ -550,9 +550,9 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         # reward = alpha * reward + torch.Tensor(lesghere, device=reward.device) * 10
 
         Q = fast_extract_pelvis_xy_batch(sequences)
-        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"])
+        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) + tmr.to(device)
 
-        tmr = torch.zeros_like(reward)
+
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)

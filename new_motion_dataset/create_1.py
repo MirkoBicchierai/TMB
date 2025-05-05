@@ -8,20 +8,21 @@ import torch
 from torch.utils.data import Dataset
 
 # === CONFIGURATION ===
-SUBJECTS                  = ['A person',  'A man', ]
-VERBS                     = ['is walking', 'walks']
-ADVERBS                   = ['', ]
-POSITION_RANGE            = (-5.0, 5.0)
-MIN_DURATION              = 3.0
-MAX_DURATION              = 6.0
-MIN_TRAJECTORY_LENGTH     = 1.5  # enforce minimum path length
-N_SAMPLES                 = 1000
-CHECKPOINTS               = 1
+SUBJECTS = ['A person', 'A man', ]
+VERBS = ['is walking', 'walks']
+ADVERBS = ['', ]
+POSITION_RANGE = (-5.0, 5.0)
+MIN_DURATION = 3.0
+MAX_DURATION = 6.0
+MIN_TRAJECTORY_LENGTH = 1.5  # enforce minimum path length
+N_SAMPLES = 1000
+CHECKPOINTS = 1
 
 # maximum straight-line from origin to corner
 dx = POSITION_RANGE[1]
 dy = POSITION_RANGE[1]
 _max_segment = math.hypot(dx, dy)
+
 
 # === DATA GENERATION ===
 def generate_split(n_samples: int,
@@ -38,9 +39,9 @@ def generate_split(n_samples: int,
     all_data: List[Dict[str, Any]] = []
     for _ in range(n_samples):
         # compose prompt intro
-        subj   = random.choice(SUBJECTS)
-        verb   = random.choice(VERBS)
-        adv    = random.choice(ADVERBS)
+        subj = random.choice(SUBJECTS)
+        verb = random.choice(VERBS)
+        adv = random.choice(ADVERBS)
 
         # sample until trajectory long enough
         while True:
@@ -49,7 +50,7 @@ def generate_split(n_samples: int,
             y1 = random.uniform(*POSITION_RANGE)
             # linear trajectory checkpoints
             trajectory = []
-            for i in range(1, CHECKPOINTS+1):
+            for i in range(1, CHECKPOINTS + 1):
                 t = i / CHECKPOINTS
                 xi = round(x0 * (1 - t) + x1 * t, 2)
                 yi = round(y0 * (1 - t) + y1 * t, 2)
@@ -57,9 +58,9 @@ def generate_split(n_samples: int,
             # compute path length
             total_dist = math.hypot(trajectory[0][0], trajectory[0][1])
             for i in range(1, len(trajectory)):
-                xp, yp = trajectory[i-1]
+                xp, yp = trajectory[i - 1]
                 xc, yc = trajectory[i]
-                total_dist += math.hypot(xc-xp, yc-yp)
+                total_dist += math.hypot(xc - xp, yc - yp)
             if total_dist >= MIN_TRAJECTORY_LENGTH:
                 break
 
@@ -73,19 +74,19 @@ def generate_split(n_samples: int,
         prompt = f"{subj} {verb}{adv} {heading}."
 
         all_data.append({
-            'prompt':     prompt,
-            'position': trajectory[0], #fix
-            'duration':   duration
+            'prompt': prompt,
+            'position': trajectory[0],  # fix
+            'duration': int(duration)
         })
 
     # shuffle and split
     random.shuffle(all_data)
     n_train = int(train_frac * n_samples)
-    n_val   = int(val_frac * n_samples)
+    n_val = int(val_frac * n_samples)
     splits = {
         'train': all_data[:n_train],
-        'val':   all_data[n_train:n_train + n_val],
-        'test':  all_data[n_train + n_val:]
+        'val': all_data[n_train:n_train + n_val],
+        'test': all_data[n_train + n_val:]
     }
 
     output_path.mkdir(parents=True, exist_ok=True)
@@ -94,6 +95,7 @@ def generate_split(n_samples: int,
         with open(fname, 'w') as f:
             json.dump(items, f, indent=2)
         print(f"Wrote {len(items)} samples to {fname}")
+
 
 # # === PYTORCH DATASET ===
 # class TrajectoryPromptDataset(Dataset):
