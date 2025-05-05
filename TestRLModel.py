@@ -297,6 +297,7 @@ def main(c: DictConfig):
     avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, args, joints_renderer, smpl_renderer)
     print(avg_tmr)
 
+
     # tmr_forward = load_tmr_model_easy(device="cpu", dataset="humanml3d")
     # GUIDANCE 7: OLD-0.801, NEW- 0.786
     # GUIDANCE 1: OLD-0.737 , NEW- 0.7187

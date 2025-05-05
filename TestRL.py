@@ -134,7 +134,7 @@ def main(c: DictConfig):
 
     # Apply LoRA configuration to the model first
     diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
-    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_1325_PRADA.pth'))
+    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_2500.pth'))
 
     #ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
     #diffusion_rl.load_state_dict(ckpt["state_dict"])
@@ -187,10 +187,12 @@ def main(c: DictConfig):
     avg_reward, avg_tmr, avg_tmr_plus_plus = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
     print("Test-reward:", avg_reward, "Test-tmr:", avg_tmr, "Test-tmr++:", avg_tmr_plus_plus)
 
-    # Validation set (short) | guidance 7 -- OLD: [tmr: 0.841 tmr++: 0.849] NEW: []
-    #                        | guidance 1 -- OLD: [tmr: 0.772 tmr++: 0.780] NEW
-    # Test set (short)       | guidance 7 -- OLD: [tmr: 0.801 tmr++: 0.812] NEW: []
-    #                        | guidance 1 -- OLD: [tmr: 0.736 tmr++: 0.750 ] NEW: []
+    # GT val (short) [tmr:0.897 tmr++: 0.892]
+    # GT test (short) [tmr: 0.836 tmr++: 0.837]
+    # Validation set (short) | guidance 7 -- OLD: [tmr: 0.841 tmr++: 0.849] NEW: [] checkpoint_2500
+    #                        | guidance 1 -- OLD: [tmr: 0.772 tmr++: 0.780] NEW: [tmr: 0.827 tmr++: 0.841] checkpoint_2500
+    # Test set (short)       | guidance 7 -- OLD: [tmr: 0.801 tmr++: 0.812] NEW: [] checkpoint_2500
+    #                        | guidance 1 -- OLD: [tmr: 0.736 tmr++: 0.750] NEW: [tmr: 0.793 Test-tmr++: 0.810] checkpoint_2500
 
 if __name__ == "__main__":
     main()
