@@ -132,4 +132,4 @@ def generate_split(n_samples: int,
 if __name__ == '__main__':
     generate_split(n_samples=N_SAMPLES,
                    output_path=Path('./data'),
-                   dataset_name='traj_')
+                   dataset_name='pos_')
