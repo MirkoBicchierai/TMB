@@ -74,7 +74,7 @@ def generate_split(n_samples: int,
 
         all_data.append({
             'prompt':     prompt,
-            'position': trajectory,
+            'position': trajectory[0], #fix
             'duration':   duration
         })
 
