@@ -387,7 +387,7 @@ def compute_reach_reward(
         traj_xy: torch.Tensor,
         lengths: torch.Tensor,
         target_xy: torch.Tensor,
-        thresh: float = 0.1,
+        thresh: float = 0.05,
         bonus: float = 1.0,
         w_shaping: float = 0.5,
 ) -> torch.Tensor:
@@ -834,8 +834,8 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
                        video_log=False, p=batch["positions"])
             #
-            # reward, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
-            #                                  c)  # shape [batch_size]
+            _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
+                                             c)  # shape [batch_size]
 
             # Q_a = render_swag(sequences, infos, smplh, batch["text"])
 
@@ -848,13 +848,13 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
             total_reward += reward.sum().item()
             batch_count_reward += reward.shape[0]
 
-            # total_tmr += tmr.sum().item()
-            # batch_count_tmr += tmr.shape[0]
+            total_tmr += tmr.sum().item()
+            batch_count_tmr += tmr.shape[0]
 
     avg_reward = total_reward / batch_count_reward
-    # avg_tmr = total_tmr / batch_count_tmr
+    avg_tmr = total_tmr / batch_count_tmr
 
-    return avg_reward, 0
+    return avg_reward, avg_tmr
 
 
 def create_folder_results(name):
