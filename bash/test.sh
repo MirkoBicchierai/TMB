@@ -1,3 +1,5 @@
 #!/bin/bash
 
-python TestRL.py sequence_fixed=false dataset_name='short_' guidance_weight=7.0 tmr_plus_plus=true val_num_batch=0 val_batch_size=16
+#python mainRL2.py group_name=Dataset-controllability-simple experiment_name=sequence-masked sequence_fixed=false  val_num_batch=0 val_batch_size=256 train_epochs=4 train_batch_size=20 lora=true num_prompts_dataset=65 num_gen_per_prompt=4 iterations=10000
+
+python mainRL3.py  group_name=New_reward_magic2 experiment_name=easier train_epochs=4 train_batch_size=20 lora=true num_prompts_dataset=64 num_gen_per_prompt=4 iterations=10000 sequence_fixed=false val_num_batch=0 val_batch_size=256

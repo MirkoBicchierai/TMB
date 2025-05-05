@@ -49,7 +49,7 @@ def generate_split(n_samples: int,
                    dataset_name: str = "",  # e.g. "motion_"
                    train_frac: float = 0.8,
                    val_frac: float = 0.1,
-                   speed: float = 2.0) -> None:
+                   speed: float = 1.0) -> None:
     """
     Generate and save JSON splits (train/val/test) under output_path.
     Filenames: {dataset_name}train.json, {dataset_name}val.json, {dataset_name}test.json
@@ -57,7 +57,7 @@ def generate_split(n_samples: int,
     # build all samples
     all_data: List[Dict[str, Any]] = []
     for _ in range(n_samples):
-        k = random.randint(1, 3)
+        k = 1#random.randint(1, 1)
         steps = gen_steps(k)
         prompt = steps_to_prompt(steps)
         total_dist = sum(dist for _, dist in steps)
