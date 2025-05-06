@@ -151,7 +151,7 @@ def main(c: DictConfig):
     infos = {
         "featsname": cfg.motion_features,
         "fps": c.fps,
-        "guidance_weight": 6# c.guidance_weight # TODO put it back
+        "guidance_weight":  c.guidance_weight
     }
 
     if c.sequence_fixed:
@@ -159,7 +159,7 @@ def main(c: DictConfig):
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=5, #c.val_batch_size, # TODO put this back!
+        batch_size=c.val_batch_size,
         shuffle=False,
         drop_last=False,
         num_workers=c.num_workers,
