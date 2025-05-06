@@ -2,13 +2,15 @@ import numpy as np
 import torch
 from colorama import Fore, Style, init
 from src.tools.guofeats.motion_representation import joints_to_guofeats
+from src.tools.extract_joints import extract_joints
 from TMR.src.guofeats import joints_to_guofeats
 from TMR.src.model.tmr import get_sim_matrix
-from src.tools.extract_joints import extract_joints
 from TMR.mtt.load_tmr_model import load_tmr_model_easy
+from TM2T.load_tm2t_model import load_tm2t_model_easy
 
 tmr_forward_plus_plus = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
 tmr_forward = load_tmr_model_easy(device="cpu", dataset="humanml3d")
+guo_forward = load_tm2t_model_easy(device="cpu", dataset="humanml3d") # humanml3d OR humanml3d_kitml_augmented_and_hn OR tmr_humanml3d_kitml_guoh3dfeats
 
 
 def smpl_to_guofeats(smpl, smplh):
@@ -41,10 +43,13 @@ def is_list_of_strings(var):
     return isinstance(var, list) and all(isinstance(item, str) for item in var)
 
 
-def print_matrix_nicely(matrix: np.ndarray):
+def print_matrix_nicely(matrix: np.ndarray, mmax=True):
     init(autoreset=True)
     for row in matrix:
-        max_val = np.max(row)
+        if mmax:
+            max_val = np.max(row)
+        else:
+            max_val = np.min(row)
         line = ""
         for val in row:
             truncated = int(val * 1000) / 1000
@@ -125,6 +130,51 @@ def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c
         special = torch.tensor(special)
 
     return special * c.reward_scale
+
+
+def euclidean_distance_matrix(matrix1, matrix2):
+    """
+        Params:
+        -- matrix1: N1 x D
+        -- matrix2: N2 x D
+        Returns:
+        -- dist: N1 x N2
+        dist[i, j] == distance(matrix1[i], matrix2[j])
+    """
+    assert matrix1.shape[1] == matrix2.shape[1]
+    d1 = -2 * np.dot(matrix1, matrix2.T)    # shape (num_test, num_train)
+    d2 = np.sum(np.square(matrix1), axis=1, keepdims=True)    # shape (num_test, 1)
+    d3 = np.sum(np.square(matrix2), axis=1)     # shape (num_train, )
+    dists = np.sqrt(d1 + d2 + d3)  # broadcasting
+    return dists
+
+
+def guo_reward(sequences, infos, smplh, real_texts, all_embedding_tmr, c):
+
+    motions = []
+    for idx in range(sequences.shape[0]):
+        x_start = sequences[idx]
+        length = infos["all_lengths"][idx].item()
+        x_start = x_start[:length]
+        motions.append(x_start.detach().cpu())
+
+    motions_guofeats = smpl_to_guofeats(motions, smplh=smplh)
+    motions_latents, texts_latents = guo_forward(motions=motions_guofeats, texts=real_texts)
+
+    sim_matrix = euclidean_distance_matrix(motions_latents.cpu().numpy(), texts_latents.cpu().numpy())
+    # print_matrix_nicely(sim_matrix, mmax=False)
+
+    sim_matrix = torch.tensor(sim_matrix)
+    # Normalization (not needed but I wanted):
+    # the Trace of the matrix is between [0, inf], so I multiply it by (-1) and add 1, Now is between [-inf, 1]. I divide by 10 for better visualization.
+    guo = (sim_matrix.diagonal() * (-1) + 1) / 10 
+
+    metrics = {
+        "guo": guo,
+        "reward": guo * c.reward_scale
+    }
+
+    return metrics
 
 
 def stillness_reward(sequences, infos, smplh):

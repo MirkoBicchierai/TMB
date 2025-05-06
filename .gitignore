@@ -3,3 +3,11 @@
 /pretrained_models/
 /ResultRL/
 /deps/
+/wandb/
+/outputs/
+**/__pycache__/
+/render_modelRL/
+/ResultRL/
+**/finest.tar
+/RL_Model/
+/.idea/
