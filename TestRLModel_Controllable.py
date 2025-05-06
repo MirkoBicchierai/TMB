@@ -116,11 +116,14 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, p=batch["positions"])
 
-            render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, "",
-                   video_log=False, p=batch["positions"])
-            #
+
             _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
-                                        c)  # shape [batch_size]
+                                        c)
+
+            render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, "",
+                   video_log=False, p=batch["positions"], tmr=tmr)
+            #
+  # shape [batch_size]
 
             # Q_a = render_swag(sequences, infos, smplh, batch["text"])
 
@@ -232,11 +235,11 @@ def main(c: DictConfig):
         # "all_lengths": torch.tensor(np.full(2048, int(args.time * args.fps))).to(device),
         "featsname": cfg.motion_features,
         "fps": args.fps,
-        "guidance_weight": 5.0
+        "guidance_weight": 1.0
     }
 
     avg_reward, avg_tmr = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
-                               smpl_renderer, c, None, path="ResultRL/TEST_RL_MODEL_guidance_5/")
+                               smpl_renderer, c, None, path="ResultRL/TEST_RL_MODEL/")
     print(avg_reward, avg_tmr)
 
     # tmr_forward = load_tmr_model_easy(device="cpu", dataset="humanml3d")

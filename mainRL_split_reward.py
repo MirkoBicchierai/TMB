@@ -166,8 +166,7 @@ def final_pelvis_points(traj_xy: torch.Tensor, lengths: torch.Tensor) -> torch.T
     return final_pts
 
 
-def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, ty_log, video_log=False, p=None,
-           tmr=None):
+def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_path, ty_log, video_log=False, p=None):
     out_formats = ['txt', 'smpl', 'videojoints']  # ['txt', 'smpl', 'joints', 'txt', 'smpl', 'videojoints', 'videosmpl']
     tmp = file_path
 
@@ -207,9 +206,7 @@ def render(x_starts, infos, smplh, joints_renderer, smpl_renderer, texts, file_p
 
         if "videojoints" in out_formats:
             video_path = file_path + str(idx) + "_joints.mp4"
-            render_texxt = text + " TMR: " + str(tmr[idx].item())
-            joints_renderer(extracted_output["joints"], title=render_texxt, output=video_path, canonicalize=False,
-                            p=p[idx])
+            joints_renderer(extracted_output["joints"], title="", output=video_path, canonicalize=False, p=p[idx])
             if video_log:
                 px, py = p[idx].detach().cpu().numpy()
                 wandb.log({ty_log: {
@@ -441,7 +438,7 @@ def tmr_reward_special(sequences, infos, smplh, texts, all_embedding_tmr, c):
     # print_matrix_nicely(sim_matrix)
 
     sim_matrix = torch.tensor(sim_matrix)
-    classic_tmr = (sim_matrix.diagonal() + 1) / 2
+    classic_tmr = sim_matrix.diagonal()
 
     if c.tmr_reward:
         return classic_tmr * c.reward_scale, classic_tmr
@@ -496,7 +493,7 @@ def preload_tmr_text(dataloader):
 
 @torch.no_grad()
 def generate(model, train_dataloader, iteration, c, device, infos, text_model, smplh,
-             train_embedding_tmr):  # , generation_iter
+             train_embedding_tmr, compute_tmr=False):  # , generation_iter
     model.train()
 
     dataset = {
@@ -537,25 +534,14 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
                                                            p=batch["positions"])
-        #
-        # _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
-        #                                  train_embedding_tmr, c)
-
-        # Q = render_swag(sequences, infos, smplh, batch["text"])
-        # lesghere = []
-        #
-        # # batch["distances"] = batch["distances"].repeat(c.num_gen_per_prompt,1)
-        # for stronzo in range(len(Q)):
-        #     r = position_reward(Q[stronzo][-1], batch["positions"])
-        #     lesghere.append(r)
-        #
-        # alpha = 0.00
-        # reward = alpha * reward + torch.Tensor(lesghere, device=reward.device) * 10
 
         Q = fast_extract_pelvis_xy_batch(sequences)
         reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"])  # + tmr.to(device)
-
-        tmr = torch.zeros_like(reward)
+        if compute_tmr:
+            _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"].repeat(c.num_gen_per_prompt, 1),
+                                        train_embedding_tmr, c)
+        else:
+            tmr = torch.zeros_like(reward)
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)
@@ -833,13 +819,12 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, p=batch["positions"])
 
-            _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
-                                        c)  # shape [batch_size]
-
             if (ty_log == "Validation" and batch_idx == 0) or ty_log == "Test":
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
-                       video_log=False, p=batch["positions"], tmr=tmr)
+                       video_log=False, p=batch["positions"])
             #
+            _, tmr = tmr_reward_special(sequences, infos, smplh, batch["tmr_text"], all_embedding_tmr,
+                                        c)  # shape [batch_size]
 
             # Q_a = render_swag(sequences, infos, smplh, batch["text"])
 
