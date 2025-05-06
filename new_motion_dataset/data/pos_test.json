@@ -1,801 +1,801 @@
 [
   {
-    "prompt": "A man walks backward.",
-    "position": [
-      1.58,
-      -3.96
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      -3.39,
-      3.22
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -3.67,
-      -3.18
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      2.54,
-      2.2
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      1.48,
-      -2.75
-    ],
-    "duration": 3
-  },
-  {
     "prompt": "A person is walking backward.",
     "position": [
-      -0.92,
-      -2.29
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      -2.14,
-      0.76
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      -3.61,
-      4.26
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -2.3,
-      -2.86
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      0.6,
-      -4.11
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      4.82,
-      4.95
-    ],
-    "duration": 5
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      3.83,
-      1.73
+      -1.88,
+      -2.9
     ],
     "duration": 3
   },
   {
     "prompt": "A person walks backward.",
     "position": [
-      1.55,
-      -2.78
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -3.07,
-      -0.62
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      0.41,
-      -3.65
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      -2.01,
-      0.55
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      2.87,
-      -3.87
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -3.53,
-      -2.23
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      2.45,
-      3.97
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -4.66,
-      -1.94
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      2.65,
-      -3.73
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      3.8,
-      -1.05
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -0.92,
-      -2.52
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      0.96,
-      1.8
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      1.06,
-      4.93
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      -1.81,
-      -4.3
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -2.67,
-      -2.7
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      3.4,
-      0.06
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -3.14,
-      -1.05
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -2.54,
-      -3.69
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      2.56,
-      4.52
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      2.4,
-      4.09
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      -2.05,
-      -4.96
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -4.55,
-      -2.99
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      1.78,
-      0.41
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      4.43,
-      -2.25
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      -1.7,
-      3.58
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      4.45,
-      3.61
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      4.65,
-      -4.5
-    ],
-    "duration": 5
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      -4.64,
-      2.49
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      2.46,
-      1.35
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      0.41,
-      4.1
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -3.84,
-      -1.89
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -0.21,
-      -1.58
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      2.54,
-      -0.13
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -0.82,
-      -4.11
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      -4.23,
-      -0.71
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -1.13,
-      -1.34
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -2.75,
-      -1.62
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -3.87,
-      -1.02
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      3.71,
-      -2.41
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -1.16,
-      -4.87
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      -2.76,
-      0.18
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -2.52,
-      -2.63
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      4.49,
+      -2.97,
       -3.62
     ],
     "duration": 4
   },
   {
-    "prompt": "A man walks forward.",
+    "prompt": "A person is walking forward.",
     "position": [
-      -1.62,
-      4.02
+      1.33,
+      2.78
     ],
     "duration": 3
   },
   {
     "prompt": "A person is walking forward.",
     "position": [
-      -3.83,
-      1.86
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      -2.05,
-      2.52
+      3.07,
+      2.03
     ],
     "duration": 3
   },
   {
     "prompt": "A person walks backward.",
     "position": [
-      -4.88,
-      -3.19
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      4.08,
-      1.93
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      2.63,
-      0.06
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -1.69,
-      -3.75
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      0.82,
-      2.41
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      3.4,
-      0.93
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      1.01,
-      2.01
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      -1.16,
-      -2.48
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      -2.88,
-      -2.32
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -3.04,
-      -1.04
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks backward.",
-    "position": [
-      4.53,
-      -3.84
+      3.79,
+      -3.48
     ],
     "duration": 5
   },
   {
-    "prompt": "A man is walking forward.",
+    "prompt": "A person walks backward.",
     "position": [
-      2.95,
-      4.16
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      1.61,
-      2.68
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      -4.54,
-      -0.39
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      0.71,
-      4.78
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      4.52,
-      -1.41
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks backward.",
-    "position": [
-      0.46,
-      -1.84
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      1.4,
-      0.99
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking backward.",
-    "position": [
-      -2.24,
-      -4.11
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      1.54,
-      2.64
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person walks forward.",
-    "position": [
-      -3.54,
-      3.78
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      2.06,
-      4.29
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      2.85,
-      3.43
+      3.25,
+      -0.34
     ],
     "duration": 3
   },
   {
     "prompt": "A person walks backward.",
     "position": [
-      -3.04,
-      -2.63
+      1.71,
+      -2.05
     ],
     "duration": 3
   },
   {
-    "prompt": "A man is walking forward.",
+    "prompt": "A person walks backward.",
     "position": [
-      2.58,
-      3.65
+      -3.48,
+      -0.83
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      2.96,
+      -3.14
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      -0.3,
+      -3.55
     ],
     "duration": 3
   },
   {
     "prompt": "A person is walking forward.",
     "position": [
-      3.41,
-      0.06
+      -0.48,
+      3.82
     ],
-    "duration": 3
-  },
-  {
-    "prompt": "A person is walking forward.",
-    "position": [
-      -0.1,
-      3.77
-    ],
-    "duration": 3
+    "duration": 4
   },
   {
     "prompt": "A person is walking backward.",
     "position": [
-      -1.65,
-      -0.03
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking forward.",
-    "position": [
-      1.91,
-      4.99
+      1.7,
+      -3.48
     ],
     "duration": 4
   },
   {
-    "prompt": "A man walks forward.",
+    "prompt": "A person walks backward.",
     "position": [
-      2.57,
-      2.08
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      0.02,
-      -4.73
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man walks forward.",
-    "position": [
-      -4.03,
-      2.26
-    ],
-    "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      3.82,
+      2.1,
       -1.0
     ],
     "duration": 3
   },
   {
-    "prompt": "A man walks forward.",
+    "prompt": "A person walks forward.",
     "position": [
-      -1.91,
-      1.56
+      -0.71,
+      1.57
     ],
     "duration": 3
   },
   {
-    "prompt": "A person is walking backward.",
+    "prompt": "A man walks forward.",
     "position": [
-      2.98,
-      -4.15
+      -1.4,
+      2.49
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -3.28,
+      3.09
     ],
     "duration": 4
   },
   {
     "prompt": "A man walks backward.",
     "position": [
-      0.12,
-      -3.69
+      -0.76,
+      -3.05
     ],
     "duration": 3
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      4.32,
-      -4.76
-    ],
-    "duration": 5
   },
   {
     "prompt": "A person walks forward.",
     "position": [
-      -0.25,
-      2.96
+      2.79,
+      0.24
     ],
     "duration": 3
   },
   {
-    "prompt": "A man is walking backward.",
+    "prompt": "A man walks forward.",
     "position": [
-      4.68,
-      -2.07
-    ],
-    "duration": 4
-  },
-  {
-    "prompt": "A man is walking backward.",
-    "position": [
-      -2.71,
-      -0.47
+      -2.39,
+      2.65
     ],
     "duration": 3
   },
   {
     "prompt": "A person walks backward.",
     "position": [
-      -4.15,
-      -4.37
+      1.43,
+      -2.11
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -3.43,
+      1.58
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      3.79,
+      0.47
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      2.65,
+      3.21
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -0.13,
+      2.35
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      -1.06,
+      2.56
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking forward.",
+    "position": [
+      -0.53,
+      3.49
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      1.78,
+      1.44
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      -2.42,
+      -3.85
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      2.14,
+      -2.7
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -2.63,
+      1.78
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      3.15,
+      0.27
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      -2.22,
+      -0.14
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      -2.91,
+      2.93
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      1.48,
+      -2.2
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      -2.01,
+      -3.15
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      3.33,
+      -1.33
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      3.29,
+      2.13
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -3.99,
+      -0.61
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      1.41,
+      2.05
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      0.14,
+      -1.92
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      -2.5,
+      1.05
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -3.88,
+      1.83
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -3.23,
+      2.74
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -0.06,
+      -1.96
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -0.79,
+      1.59
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -3.94,
+      0.59
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      2.71,
+      1.92
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -3.55,
+      1.43
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      -2.56,
+      -3.32
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -4.0,
+      1.01
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      0.11,
+      3.87
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -3.85,
+      1.72
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -1.11,
+      -1.96
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      0.09,
+      2.02
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      1.99,
+      3.45
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      -0.59,
+      -3.4
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      3.91,
+      3.37
+    ],
+    "duration": 5
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      1.57,
+      2.85
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      3.2,
+      3.85
+    ],
+    "duration": 5
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      3.2,
+      0.85
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      3.68,
+      3.15
+    ],
+    "duration": 5
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      2.38,
+      -2.56
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -1.36,
+      2.22
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -0.54,
+      -3.56
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      -2.18,
+      0.21
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      -1.8,
+      -3.49
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -0.75,
+      2.37
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      1.98,
+      -0.99
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -3.62,
+      -3.56
     ],
     "duration": 5
   },
   {
     "prompt": "A man walks backward.",
     "position": [
-      0.61,
-      -3.55
+      1.76,
+      -1.96
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      -2.46,
+      1.53
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      0.66,
+      2.47
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking forward.",
+    "position": [
+      -0.04,
+      2.69
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -1.1,
+      2.12
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      -3.43,
+      -0.14
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      3.88,
+      3.1
+    ],
+    "duration": 5
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      0.65,
+      -3.22
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      -3.4,
+      -2.45
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      1.39,
+      3.16
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking forward.",
+    "position": [
+      1.72,
+      3.9
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      0.76,
+      3.68
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      1.64,
+      -3.73
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      -1.2,
+      1.24
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      3.9,
+      -1.05
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -1.68,
+      -1.16
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      3.4,
+      -3.01
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking forward.",
+    "position": [
+      -2.62,
+      2.71
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      2.03,
+      -1.22
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks forward.",
+    "position": [
+      3.85,
+      0.02
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      1.8,
+      -0.71
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      -3.78,
+      -3.94
+    ],
+    "duration": 5
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -0.15,
+      -3.8
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      0.06,
+      3.85
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man is walking backward.",
+    "position": [
+      1.87,
+      -3.26
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -1.19,
+      -1.43
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person walks backward.",
+    "position": [
+      2.7,
+      -2.13
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -0.31,
+      -2.06
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A person is walking backward.",
+    "position": [
+      -1.9,
+      -0.11
+    ],
+    "duration": 3
+  },
+  {
+    "prompt": "A man walks forward.",
+    "position": [
+      2.71,
+      3.57
+    ],
+    "duration": 4
+  },
+  {
+    "prompt": "A man walks backward.",
+    "position": [
+      2.06,
+      -1.66
     ],
     "duration": 3
   }

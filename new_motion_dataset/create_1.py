@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 SUBJECTS = ['A person', 'A man', ]
 VERBS = ['is walking', 'walks']
 ADVERBS = ['', ]
-POSITION_RANGE = (-5.0, 5.0)
+POSITION_RANGE = (-4.0, 4.0)
 MIN_DURATION = 3.0
 MAX_DURATION = 6.0
 MIN_TRAJECTORY_LENGTH = 1.5  # enforce minimum path length

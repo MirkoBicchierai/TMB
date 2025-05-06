@@ -10,11 +10,16 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import numpy as np
 from src.tools.rifke import canonicalize_rotation
+from mpl_toolkits.mplot3d.art3d import PathPatch3D
+from mpl_toolkits.mplot3d import art3d
+from matplotlib.patches import Circle
+
 
 logger = logging.getLogger("matplotlib.animation")
 logger.setLevel(logging.ERROR)
 
 colors = ("black", "magenta", "red", "green", "blue")
+radius = 1.5
 
 KINEMATIC_TREES = {
     "smpljoints": [
@@ -42,6 +47,7 @@ class MatplotlibRender:
     figsize: int = 4
     fontsize: int = 15
     canonicalize: bool = False
+    radius: float = 1.5
 
     def __call__(
         self,
@@ -51,7 +57,8 @@ class MatplotlibRender:
         highlights=None,
         title: str = "",
         canonicalize=None,
-        p=None
+        p=None,
+        radius=None
     ):
         canonicalize = canonicalize if canonicalize is not None else self.canonicalize
         fps = fps if fps is not None else self.fps
@@ -70,7 +77,8 @@ class MatplotlibRender:
             figsize=(self.figsize, self.figsize),
             fontsize=self.fontsize,
             canonicalize=canonicalize,
-            p=p
+            p=p,
+            radius=self.radius
         )
 
 
@@ -149,7 +157,8 @@ def render_animation(
     fontsize: int = 15,
     canonicalize: bool = False,
     agg=True,
-    p=None
+    p=None,
+    radius: float = radius
 ):
     if agg:
         import matplotlib
@@ -182,7 +191,7 @@ def render_animation(
 
     # Create a figure and initialize 3d plot
     fig = plt.figure(figsize=figsize)
-    ax = init_axis(fig, title)
+    ax = init_axis(fig, title, radius=radius)
 
     # Create spline line
     trajectory = joints[:, 0, [x, y]]
@@ -199,17 +208,27 @@ def render_animation(
 
     if p is not None:
         px, py = p.detach().cpu().numpy()
-        ax.scatter(
-            px, py, 0,
-            color="red",  # pick any color you like
-            marker="o",  # or "x", "^", etc.
-            s=60,  # marker size
-            zorder=30,  # draw on top
-            depthshade=True
-        )
+        # ax.scatter(
+        #     px, py, 0,
+        #     color="red",  # pick any color you like
+        #     marker="o",  # or "x", "^", etc.
+        #     s=60,  # marker size
+        #     zorder=30,  # draw on top
+        #     depthshade=False
+        # )
+
+        # Create a 2D circle in XY plane
+        circle = Circle((px, py), radius=0.1, color="red", zorder=30)
+
+        # Add the 2D patch to the 3D axes
+        ax.add_patch(circle)
+
+        # Project the 2D patch into 3D at z=0
+        art3d.pathpatch_2d_to_3d(circle, z=0, zdir="z")
+
         ax.text(
-            px, py, 0,
-            f"x: {px:.2f} y: {py:.2f}",  # label
+            0, 0, 0,
+            f"x: {px:.2f} \ny: {py:.2f}",  # label
             color="red",
             fontsize=fontsize,
             zorder=31
@@ -229,7 +248,7 @@ def render_animation(
         skeleton = joints[frame]
 
         root = skeleton[0]
-        update_camera(ax, root)
+        update_camera(ax, root, radius=radius)
 
         hcolors = colors
         if highlights is not None and highlights[frame]:
@@ -244,7 +263,7 @@ def render_animation(
                         skeleton[chain, x],
                         skeleton[chain, y],
                         skeleton[chain, z],
-                        linewidth=6.0,
+                        linewidth=4.0,
                         color=color,
                         zorder=20,
                         path_effects=[pe.SimpleLineShadow(), pe.Normal()],
