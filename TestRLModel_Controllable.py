@@ -223,7 +223,7 @@ def main(c: DictConfig):
 
     # Apply LoRA configuration to the model first
     diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
-    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/better_no_tmr.pth'))
+    diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/better_tmr_best.pth'))
 
     diffusion_rl = diffusion_rl.to(device)
 
