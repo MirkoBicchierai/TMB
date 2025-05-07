@@ -33,8 +33,7 @@ def smpl_to_guofeats(smpl, smplh):
     return guofeats
 
 
-def calc_eval_stats(x, smplh, forward):
-    x_guofeats = smpl_to_guofeats(x, smplh)
+def calc_eval_stats(x_guofeats, forward):
     x_latents = forward(x_guofeats)# tensor(N, 256)
     return x_latents
 
@@ -73,8 +72,10 @@ def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c
         x_start = x_start[:length]
         motions.append(x_start.detach().cpu())
 
-    x_latents = calc_eval_stats(motions, smplh, tmr_forward)
-    x_latents_plus_plus = calc_eval_stats(motions, smplh, tmr_forward_plus_plus)
+    motions_guofeats = smpl_to_guofeats(motions, smplh=smplh)
+
+    x_latents = calc_eval_stats(motions_guofeats, tmr_forward)
+    x_latents_plus_plus = calc_eval_stats(motions_guofeats, tmr_forward_plus_plus)
 
     sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
     # print_matrix_nicely(sim_matrix)
@@ -90,11 +91,19 @@ def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c
     sim_matrix_plus_plus = (sim_matrix_plus_plus + 1) / 2
     tmr_plus_plus = sim_matrix_plus_plus.diagonal()
 
+    motions_latents, texts_latents = guo_forward(motions=motions_guofeats, texts=real_texts)
+    sim_matrix = euclidean_distance_matrix(motions_latents.cpu().numpy(), texts_latents.cpu().numpy())
+    # print_matrix_nicely(sim_matrix, mmax=False)
+
+    sim_matrix = torch.tensor(sim_matrix)
+    guo_et_al = sim_matrix.diagonal()
+
     if c.tmr_reward:
 
         metrics = {
             "tmr": tmr,
             "tmr++": tmr_plus_plus,
+            "guo": guo_et_al,
             "reward": tmr_plus_plus * c.reward_scale if c.tmr_plus_plus else tmr * c.reward_scale
         }
 

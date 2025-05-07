@@ -136,7 +136,7 @@ class MotionPromptDataset(Dataset):
 if __name__ == '__main__':
     # Example: generate 10k samples and save to ./data
     generate_split(n_samples=1000,
-                   output_path=Path('./motion_dataset'),
+                   output_path=Path('motion_dataset'),
                    dataset_name='motion_')
 
     # Then in your config:

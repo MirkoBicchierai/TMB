@@ -7,7 +7,7 @@ from TMR.mtt.load_tmr_model import load_tmr_model_easy
 tmr_forward = load_tmr_model_easy(device="cpu", dataset="tmr_humanml3d_kitml_guoh3dfeats")
 
 # Load the JSON data
-with open('/home/mbicchierai/Tesi Magistrale/motion_dataset/motion_test.json', 'r') as f:
+with open('/motion_dataset/motion_test.json', 'r') as f:
     data = json.load(f)
 
 # Iterate through each entry and add "text_tmr": "" to each annotation
