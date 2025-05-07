@@ -252,11 +252,9 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
                                                            p=batch["positions"])
 
         tmr = only_tmr_plus_plus(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
-
         Q = fast_extract_pelvis_xy_batch(sequences)
         reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) + tmr.to(device)
-
-        tmr = torch.zeros_like(reward)
+        #tmr = torch.zeros_like(reward)
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)
