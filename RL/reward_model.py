@@ -60,6 +60,27 @@ def print_matrix_nicely(matrix: np.ndarray, mmax=True):
         print(line)
 
 
+def only_tmr_plus_plus(sequences, infos, smplh, real_texts, all_embedding_tmr, c):
+    texts_plus_plus = tmr_forward_plus_plus(real_texts)
+
+    motions = []
+    for idx in range(sequences.shape[0]):
+        x_start = sequences[idx]
+        length = infos["all_lengths"][idx].item()
+        x_start = x_start[:length]
+        motions.append(x_start.detach().cpu())
+
+    motions_guofeats = smpl_to_guofeats(motions, smplh=smplh)
+
+    x_latents_plus_plus = calc_eval_stats(motions_guofeats, tmr_forward_plus_plus)
+    sim_matrix_plus_plus = get_sim_matrix(x_latents_plus_plus, texts_plus_plus.detach().cpu().type(x_latents_plus_plus.dtype)).numpy()
+
+    sim_matrix_plus_plus = torch.tensor(sim_matrix_plus_plus)
+    sim_matrix_plus_plus = (sim_matrix_plus_plus + 1) / 2
+    tmr_plus_plus = sim_matrix_plus_plus.diagonal()
+
+    return tmr_plus_plus
+
 def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c):
 
     texts_plus_plus = tmr_forward_plus_plus(real_texts)

@@ -7,7 +7,7 @@ import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
-from RL.reward_model import tmr_reward_special
+from RL.reward_model import tmr_reward_special, only_tmr_plus_plus
 from RL.utils import get_embeddings_2, get_embeddings
 from src.tools.smpl_layer import SMPLH
 from torch.utils.data import DataLoader
@@ -251,10 +251,10 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         sequences, results_by_timestep = model.diffusionRL_controllable(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
                                                            p=batch["positions"])
 
-        metrics = tmr_reward_special(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
+        tmr = only_tmr_plus_plus(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
 
         Q = fast_extract_pelvis_xy_batch(sequences)
-        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) + metrics["tmr++"].to(device)
+        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) + tmr.to(device)
 
         tmr = torch.zeros_like(reward)
 
