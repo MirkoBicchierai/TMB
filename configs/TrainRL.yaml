@@ -5,6 +5,8 @@ joints_renderer:
   colors: ['black', 'magenta', 'red', 'green', 'blue']
   figsize: 4
   canonicalize: true
+  radius: 4.0
+  fontsize: 10
 
 smpl_renderer:
   _target_: src.renderer.humor.HumorRenderer
