@@ -1,6 +1,7 @@
 import argparse
 import os
 import hydra
+import numpy as np
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig
@@ -38,7 +39,9 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
 
+            #if not .sequence_fixed:
             infos["all_lengths"] = batch["length"]
+
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos, p=batch["positions"])
 
             metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)
@@ -86,7 +89,7 @@ def parse_arguments():
     parser.add_argument("--run_dir", type=str, default='pretrained_models/mdm-smpl_clip_smplrifke_humanml3d',
                         help="Run directory")
 
-    parser.add_argument("--ckpt_name", type=str, default='logs/checkpoints/last.ckpt', help="Checkpoint file name")
+    parser.add_argument("--ckpt_name", type=str, default='/home/mbicchierai/Tesi Magistrale/RL_Model/best_controllable.pth', help="Checkpoint file name")
 
     return parser.parse_args()
 
@@ -154,10 +157,13 @@ def main(c: DictConfig):
                                 num_workers=c.num_workers, collate_fn=movement_collate_fn)
 
     infos = {
+
         "featsname": cfg.motion_features,
         "fps": args.fps,
         "guidance_weight": 1.0
     }
+    if args.sequence_fixed:
+        infos["all_lengths"] = torch.tensor(np.full(2048, int(200))).to(device)
 
     avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer,
                                smpl_renderer, c, None, path="ResultRL/TEST_RL_MODEL/")
