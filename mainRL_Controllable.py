@@ -170,7 +170,7 @@ def compute_reach_reward(
         traj_xy: torch.Tensor,
         lengths: torch.Tensor,
         target_xy: torch.Tensor,
-        thresh: float = 0.1,
+        thresh: float = 0.3,
         bonus: float = 1.0,
         w_shaping: float = 0.5,
 ) -> torch.Tensor:
@@ -251,10 +251,10 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         sequences, results_by_timestep = model.diffusionRL_controllable(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos,
                                                            p=batch["positions"])
 
-        tmr = only_tmr_plus_plus(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
+        #tmr = only_tmr_plus_plus(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr, c)
         Q = fast_extract_pelvis_xy_batch(sequences)
-        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) + tmr.to(device)
-        #tmr = torch.zeros_like(reward)
+        reward = compute_reach_reward(Q, infos["all_lengths"].long(), batch["positions"]) #+ tmr.to(device)
+        tmr = torch.zeros_like(reward)
 
         timesteps = sorted(results_by_timestep.keys(), reverse=True)
         diff_step = len(timesteps)
@@ -580,7 +580,7 @@ def main(c: DictConfig):
     )
 
     create_folder_results("ResultRL")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda:2" if torch.cuda.is_available() else "cpu"
 
     cfg = read_config(c.run_dir)
 

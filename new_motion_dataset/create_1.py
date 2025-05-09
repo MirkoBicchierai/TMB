@@ -11,17 +11,14 @@ from torch.utils.data import Dataset
 SUBJECTS = ['A person', 'A man', ]
 VERBS = ['is walking', 'walks']
 ADVERBS = ['', ]
-POSITION_RANGE = (-4.0, 4.0)
-MIN_DURATION = 3.0
-MAX_DURATION = 6.0
-MIN_TRAJECTORY_LENGTH = 1.5  # enforce minimum path length
+
+MIN_DURATION = 2
+MAX_DURATION = 10
+
 N_SAMPLES = 1000
 CHECKPOINTS = 1
-
-# maximum straight-line from origin to corner
-dx = POSITION_RANGE[1]
-dy = POSITION_RANGE[1]
-_max_segment = math.hypot(dx, dy)
+HUMAN_SPEED = 0.7
+MIN_TRAJECTORY_LENGTH = HUMAN_SPEED * MIN_DURATION - 0.1  # enforce minimum path length
 
 
 # === DATA GENERATION ===
@@ -43,11 +40,15 @@ def generate_split(n_samples: int,
         verb = random.choice(VERBS)
         adv = random.choice(ADVERBS)
 
+        duration = random.randint(MIN_DURATION, MAX_DURATION)
+        max_pos = duration * HUMAN_SPEED
+        min_pos = max(MIN_TRAJECTORY_LENGTH, max_pos - 1)
+
         # sample until trajectory long enough
         while True:
             x0, y0 = 0.0, 0.0
-            x1 = random.uniform(*POSITION_RANGE)
-            y1 = random.uniform(*POSITION_RANGE)
+            x1 = random.uniform(-max_pos, max_pos)
+            y1 = random.uniform(-max_pos, max_pos)
             # linear trajectory checkpoints
             trajectory = []
             for i in range(1, CHECKPOINTS + 1):
@@ -61,17 +62,14 @@ def generate_split(n_samples: int,
                 xp, yp = trajectory[i - 1]
                 xc, yc = trajectory[i]
                 total_dist += math.hypot(xc - xp, yc - yp)
-            if total_dist >= MIN_TRAJECTORY_LENGTH:
+            if min_pos <= total_dist <= max_pos:
                 break
 
         # duration scaling and clamp
-        raw_dur = (total_dist / _max_segment) * MAX_DURATION
-        duration = round(raw_dur, 2)
-        duration = max(min(duration, MAX_DURATION), MIN_DURATION)
 
         # determine heading based on final y
         heading = 'forward' if y1 > 0 else 'backward'
-        prompt = f"{subj} {verb}{adv} {heading}."
+        prompt = f"{subj} {verb}{adv} {heading}, then stops."
 
         all_data.append({
             'prompt': prompt,

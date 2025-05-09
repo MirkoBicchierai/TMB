@@ -218,7 +218,7 @@ def render_animation(
         # )
 
         # Create a 2D circle in XY plane
-        circle = Circle((px, py), radius=0.1, color="red", zorder=30)
+        circle = Circle((px, py), radius=0.3, color="red", zorder=30)
 
         # Add the 2D patch to the 3D axes
         ax.add_patch(circle)

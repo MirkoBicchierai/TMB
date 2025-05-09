@@ -12,8 +12,8 @@ SUBJECTS       = ['A person', 'A man']
 VERBS          = ['is walking',  'is pacing', 'walks']
 ADVERBS        = ['']
 POSITION_RANGE = (-2.0, 2.0)
-MIN_DURATION   = 4.0
-MAX_DURATION   = 5.0
+MIN_DURATION   = 6.0
+MAX_DURATION   = 10.0
 N_SAMPLES      = 10000
 
 # precompute the max possible distance (corner to origin)
