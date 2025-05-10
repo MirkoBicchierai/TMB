@@ -81,11 +81,43 @@ def only_tmr_plus_plus(sequences, infos, smplh, real_texts, all_embedding_tmr, c
 
     return tmr_plus_plus
 
-def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c):
-
-    texts_plus_plus = tmr_forward_plus_plus(real_texts)
+def tmr_metrics(motions_guofeats,real_texts, c):
     texts = tmr_forward(real_texts)
+    x_latents = calc_eval_stats(motions_guofeats, tmr_forward)
+    sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
+    sim_matrix = torch.tensor(sim_matrix)
+    sim_matrix = (sim_matrix + 1) / 2
+    tmr = sim_matrix.diagonal()
 
+    reward = tmr * c.reward_scale
+
+    return tmr, reward
+
+def tmr_plus_plus_metrics(motions_guofeats,real_texts, c):
+    texts_plus_plus = tmr_forward_plus_plus(real_texts)
+    x_latents_plus_plus = calc_eval_stats(motions_guofeats, tmr_forward_plus_plus)
+
+    sim_matrix_plus_plus = get_sim_matrix(x_latents_plus_plus,texts_plus_plus.detach().cpu().type(texts_plus_plus.dtype)).numpy()
+
+    sim_matrix_plus_plus = torch.tensor(sim_matrix_plus_plus)
+    sim_matrix_plus_plus = (sim_matrix_plus_plus + 1) / 2
+    tmr_plus_plus = sim_matrix_plus_plus.diagonal()
+
+    reward = tmr_plus_plus * c.reward_scale
+
+    return tmr_plus_plus, reward
+
+def guo_metrics(motions_guofeats, real_texts, c):
+    motions_latents, texts_latents = guo_forward(motions=motions_guofeats, texts=real_texts)
+    sim_matrix = euclidean_distance_matrix(motions_latents.cpu().numpy(), texts_latents.cpu().numpy())
+
+    sim_matrix = torch.tensor(sim_matrix)
+    guo_et_al = sim_matrix.diagonal()
+    #reward = (1 / (guo_et_al + 1)) * c.reward_scale
+    reward = -guo_et_al
+    return guo_et_al, reward
+
+def get_motion_guofeats(sequences, infos, smplh):
     motions = []
     for idx in range(sequences.shape[0]):
         x_start = sequences[idx]
@@ -95,72 +127,86 @@ def tmr_reward_special(sequences, infos, smplh, real_texts, all_embedding_tmr, c
 
     motions_guofeats = smpl_to_guofeats(motions, smplh=smplh)
 
-    x_latents = calc_eval_stats(motions_guofeats, tmr_forward)
-    x_latents_plus_plus = calc_eval_stats(motions_guofeats, tmr_forward_plus_plus)
+    return motions_guofeats
 
-    sim_matrix = get_sim_matrix(x_latents, texts.detach().cpu().type(x_latents.dtype)).numpy()
-    # print_matrix_nicely(sim_matrix)
 
-    sim_matrix_plus_plus = get_sim_matrix(x_latents_plus_plus, texts_plus_plus.detach().cpu().type(x_latents.dtype)).numpy()
-    # print_matrix_nicely(sim_matrix)
+def reward_model(sequences, infos, smplh, real_texts, c):
+    metrics = {}
 
-    sim_matrix = torch.tensor(sim_matrix)
-    sim_matrix = (sim_matrix + 1) / 2
-    tmr = sim_matrix.diagonal()
+    motions_guofeats = get_motion_guofeats(sequences, infos, smplh)
 
-    sim_matrix_plus_plus = torch.tensor(sim_matrix_plus_plus)
-    sim_matrix_plus_plus = (sim_matrix_plus_plus + 1) / 2
-    tmr_plus_plus = sim_matrix_plus_plus.diagonal()
-
-    motions_latents, texts_latents = guo_forward(motions=motions_guofeats, texts=real_texts)
-    sim_matrix = euclidean_distance_matrix(motions_latents.cpu().numpy(), texts_latents.cpu().numpy())
-    # print_matrix_nicely(sim_matrix, mmax=False)
-
-    sim_matrix = torch.tensor(sim_matrix)
-    guo_et_al = sim_matrix.diagonal()
-
-    if c.tmr_reward:
-
+    if c.reward == "TMR":
+        tmr, reward = tmr_metrics(motions_guofeats,real_texts, c)
         metrics = {
             "tmr": tmr,
-            "tmr++": tmr_plus_plus,
-            "guo": guo_et_al,
-            "reward": tmr_plus_plus * c.reward_scale if c.tmr_plus_plus else tmr * c.reward_scale
+            "reward": reward
         }
 
-        return metrics
-    else:
+    if c.reward == "TMR++":
+        tmr_plus_plus, reward = tmr_metrics(motions_guofeats,real_texts, c)
+        metrics = {
+            "tmr++": tmr_plus_plus,
+            "reward" : reward
+        }
 
-        sim_matrix_tmp = get_sim_matrix(x_latents, all_embedding_tmr.detach().cpu().type(x_latents.dtype)).numpy()
-        # print_matrix_nicely(sim_matrix_tmp)
+    if c.reward == "GUO":
+        guo_et_al, reward = guo_metrics(motions_guofeats,real_texts, c)
+        metrics = {
+            "guo": guo_et_al,
+            "reward": reward
+        }
 
-        sim_matrix_tmp = (sim_matrix_tmp + 1) / 2
-        diagonal_values = sim_matrix.diagonal()
+    return metrics
 
-        # Calculate similarity between texts and all_embedding_tmr and find the most similar embedding in all_embedding_tmr
-        text_to_all_sim = torch.matmul(texts.detach().cpu(), all_embedding_tmr.transpose(0, 1))
+def all_metrics(sequences, infos, smplh, real_texts, c):
 
-        matching_indices = torch.argmax(text_to_all_sim, dim=1)
+    motions_guofeats = get_motion_guofeats(sequences, infos, smplh)
 
-        special = []
-        for i in range(sim_matrix_tmp.shape[0]):
-            # Get the index to exclude for this row
-            exclude_idx = matching_indices[i].item()
-            # Make a copy of the row and set the element to exclude to NaN
-            row_copy = sim_matrix_tmp[i].copy()
-            row_copy[exclude_idx] = np.nan
-            row_copy[row_copy > c.masking_ratio] = np.nan
+    guo_et_al, _  = guo_metrics(motions_guofeats, real_texts, c)
+    tmr_plus_plus, _ = tmr_metrics(motions_guofeats, real_texts, c)
+    tmr, _ = tmr_metrics(motions_guofeats, real_texts, c)
 
-            # Calculate mean without the excluded element
-            row_mean = np.nanmean(row_copy)
-            # Calculate special value for this row (real - mean of row of all emb)
-            special_value = diagonal_values[i] - row_mean
-            special.append(special_value)
+    metrics = {
+        "tmr": tmr,
+        "tmr++": tmr_plus_plus,
+        "guo": guo_et_al,
+    }
 
-        special = torch.tensor(special)
+    return metrics
 
-    return special * c.reward_scale
+"""
+    TMR SPECIAL
 
+    sim_matrix_tmp = get_sim_matrix(x_latents, all_embedding_tmr.detach().cpu().type(x_latents.dtype)).numpy()
+    # print_matrix_nicely(sim_matrix_tmp)
+
+    sim_matrix_tmp = (sim_matrix_tmp + 1) / 2
+    diagonal_values = sim_matrix.diagonal()
+
+    # Calculate similarity between texts and all_embedding_tmr and find the most similar embedding in all_embedding_tmr
+    text_to_all_sim = torch.matmul(texts.detach().cpu(), all_embedding_tmr.transpose(0, 1))
+
+    matching_indices = torch.argmax(text_to_all_sim, dim=1)
+
+    special = []
+    for i in range(sim_matrix_tmp.shape[0]):
+        # Get the index to exclude for this row
+        exclude_idx = matching_indices[i].item()
+        # Make a copy of the row and set the element to exclude to NaN
+        row_copy = sim_matrix_tmp[i].copy()
+        row_copy[exclude_idx] = np.nan
+        row_copy[row_copy > c.masking_ratio] = np.nan
+
+        # Calculate mean without the excluded element
+        row_mean = np.nanmean(row_copy)
+        # Calculate special value for this row (real - mean of row of all emb)
+        special_value = diagonal_values[i] - row_mean
+        special.append(special_value)
+
+    special = torch.tensor(special)
+
+return special * c.reward_scale
+"""
 
 def euclidean_distance_matrix(matrix1, matrix2):
     """

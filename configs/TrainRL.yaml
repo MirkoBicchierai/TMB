@@ -50,8 +50,7 @@ grad_clip: 1.0
 advantage_clip_epsilon: 1e-4
 
 # Reward Model
-tmr_reward: true
-tmr_plus_plus: true
+reward: "TMR"
 
 masking_ratio: 0.75
 reward_scale: 10
