@@ -73,18 +73,24 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         metrics_reward = reward_model(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, c)
 
-        if torch.isnan(metrics_reward["tmr"].cpu()).any() or torch.isnan(
-                metrics_reward["tmr++"].cpu()).any() or torch.isnan(
-                sequences.cpu()).any():
+        has_nan = (
+                any(torch.isnan(t.cpu()).any() for t in metrics_reward.values())
+                or torch.isnan(sequences.cpu()).any()
+        )
+
+        if has_nan:
             print("Found NaN in masked_tmr")
-            # Do something if there is at least one NaN
-            masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
-            masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
             save_dir = "NaN_folder"
             os.makedirs(save_dir, exist_ok=True)
+            # Do something if there is at least one NaN
+            try:
+                masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
+                np.save(os.path.join(save_dir, "masked_tmr_with_nan.npy"), masked_tmr_np)
+
+            except:
+                masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
+                np.save(os.path.join(save_dir, "masked_tmr_plus_with_nan.npy"), masked_tmr_plus_np)
             # Save to .npy file
-            np.save(os.path.join(save_dir, "masked_tmr_with_nan.npy"), masked_tmr_np)
-            np.save(os.path.join(save_dir, "masked_tmr_plus_with_nan.npy"), masked_tmr_plus_np)
             np.save(os.path.join(save_dir, "sequences.npy"), sequences.cpu().numpy())
             import json
             with open(os.path.join(save_dir, "infos.json"), "w") as f:
@@ -398,6 +404,30 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             metrics_reward = reward_model(sequences, infos, smplh, batch["text"], c)
             metrics = all_metrics(sequences, infos, smplh, batch["text"], c)
+
+            has_nan = (
+                    any(torch.isnan(t.cpu()).any() for t in metrics_reward.values())
+                    or torch.isnan(sequences.cpu()).any()
+            )
+
+            if has_nan:
+                print("Found NaN in masked_tmr")
+                save_dir = "NaN_folder"
+                os.makedirs(save_dir, exist_ok=True)
+                # Do something if there is at least one NaN
+                try:
+                    masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
+                    np.save(os.path.join(save_dir, "masked_tmr_with_nan.npy"), masked_tmr_np)
+
+                except:
+                    masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
+                    np.save(os.path.join(save_dir, "masked_tmr_plus_with_nan.npy"), masked_tmr_plus_np)
+                # Save to .npy file
+                np.save(os.path.join(save_dir, "sequences.npy"), sequences.cpu().numpy())
+                import json
+                with open(os.path.join(save_dir, "infos.json"), "w") as f:
+                    infos["all_lengths"] = infos["all_lengths"].tolist()
+                    json.dump(infos, f, indent=4)
 
             total_reward += metrics_reward["reward"].sum().item()
             batch_count_reward += metrics_reward["reward"].shape[0]
