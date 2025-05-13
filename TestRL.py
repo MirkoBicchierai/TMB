@@ -13,7 +13,7 @@ from src.config import read_config
 from src.model.text_encoder import TextToEmb
 from peft import LoraModel, LoraConfig
 from RL.utils import render, get_embeddings, freeze_normalization_layers, create_folder_results
-
+import pytorch_lightning as pl
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -40,13 +40,14 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
     model.eval()
 
     if c.val_num_batch == 0:
-        generate_bar = tqdm(enumerate(dataloader), leave=False, desc=f"[Validation/Test Generations]", total=len(dataloader))
+        generate_bar = tqdm(enumerate(dataloader), leave=False, desc=f"[Validation/Test Generations]",
+                            total=len(dataloader))
     else:
         generate_bar = tqdm(enumerate(itertools.islice(itertools.cycle(dataloader), c.val_num_batch)),
                             total=c.val_num_batch, leave=False, desc=f"[Validation/Test Generations]")
 
-    total_reward, total_tmr, total_tmr_plus_plus, total_guo = 0, 0, 0, 0
-    batch_count_reward, batch_count_tmr, batch_count_tmr_plus_plus = 0, 0, 0
+    total_reward, total_tmr, total_tmr_plus_plus, total_tmr_guo = 0, 0, 0, 0
+    batch_count_reward, batch_count_tmr, batch_count_tmr_plus_plus, batch_count_guo = 0, 0, 0, 0
 
     for batch_idx, batch in generate_bar:
         tmp_path = path + "batch_" + str(batch_idx) + "/"
@@ -61,11 +62,11 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
 
             sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
 
-            if False:
-               render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log, out_formats, video_log=True)
+            if ((ty_log == "Validation" and batch_idx == 0) or ty_log == "Test") and c.render_videos:
+                render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
+                       out_formats, video_log=True)
 
-            metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)  # shape [batch_size]
-            metrics_guo = guo_reward(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)
+            metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)
 
             total_reward += metrics["reward"].sum().item()
             batch_count_reward += metrics["reward"].shape[0]
@@ -76,14 +77,15 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
             total_tmr_plus_plus += metrics["tmr++"].sum().item()
             batch_count_tmr_plus_plus += metrics["tmr++"].shape[0]
 
-            total_guo += metrics_guo["guo"].sum().item()
+            total_tmr_guo += metrics["guo"].sum().item()
+            batch_count_guo += metrics["guo"].shape[0]
 
     avg_reward = total_reward / batch_count_reward
     avg_tmr = total_tmr / batch_count_tmr
     avg_tmr_plus_plus = total_tmr_plus_plus / batch_count_tmr_plus_plus
-    total_guo = total_guo / batch_count_tmr
+    avg_guo = total_tmr_guo / batch_count_guo
 
-    return avg_reward, avg_tmr, avg_tmr_plus_plus, total_guo
+    return avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo
 
 @hydra.main(config_path="configs", config_name="TrainRL", version_base="1.3")
 def main(c: DictConfig):
@@ -93,6 +95,7 @@ def main(c: DictConfig):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     cfg = read_config(c.run_dir)
+    pl.seed_everything(cfg.seed)
 
     joints_renderer = instantiate(c.joints_renderer)
     smpl_renderer = instantiate(c.smpl_renderer)
@@ -115,43 +118,46 @@ def main(c: DictConfig):
 
     diffusion_rl = instantiate(cfg.diffusion)
 
-    # lora_config = LoraConfig(
-    #     r=c.lora_rank,
-    #     lora_alpha=c.lora_alpha,
-    #     target_modules=[
-    #         "to_skel_layer",
-    #         "skel_embedding",
-    #         "tx_embedding.0",
-    #         "tx_embedding.2",
-    #         "seqTransEncoder.layers.0.self_attn.out_proj",
-    #         "seqTransEncoder.layers.1.self_attn.out_proj",
-    #         "seqTransEncoder.layers.2.self_attn.out_proj",
-    #         "seqTransEncoder.layers.3.self_attn.out_proj",
-    #         "seqTransEncoder.layers.4.self_attn.out_proj",
-    #         "seqTransEncoder.layers.5.self_attn.out_proj",
-    #         "seqTransEncoder.layers.6.self_attn.out_proj",
-    #         "seqTransEncoder.layers.7.self_attn.out_proj",
-    #     ],
-    #     lora_dropout=c.lora_dropout,
-    #     bias=c.lora_bias,
-    # )
+    lora_config = LoraConfig(
+        r=c.lora_rank,
+        lora_alpha=c.lora_alpha,
+        target_modules=[
+            "to_skel_layer",
+            "skel_embedding",
+            "tx_embedding.0",
+            "tx_embedding.2",
+            "seqTransEncoder.layers.0.self_attn.out_proj",
+            "seqTransEncoder.layers.1.self_attn.out_proj",
+            "seqTransEncoder.layers.2.self_attn.out_proj",
+            "seqTransEncoder.layers.3.self_attn.out_proj",
+            "seqTransEncoder.layers.4.self_attn.out_proj",
+            "seqTransEncoder.layers.5.self_attn.out_proj",
+            "seqTransEncoder.layers.6.self_attn.out_proj",
+            "seqTransEncoder.layers.7.self_attn.out_proj",
+        ],
+        lora_dropout=c.lora_dropout,
+        bias=c.lora_bias,
+    )
 
     # Apply LoRA configuration to the model first
-    # diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
-    # diffusion_rl.load_state_dict(torch.load('/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_2500.pth'))
+    diffusion_rl.denoiser = LoraModel(diffusion_rl.denoiser, lora_config, "sus")
+    ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/RL_Model/checkpoint_2075.pth", map_location="cuda")
+    diffusion_rl.load_state_dict(ckpt)
 
-    ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
-    diffusion_rl.load_state_dict(ckpt["state_dict"])
+    # ckpt = torch.load("/home/mbicchierai/Tesi Magistrale/pretrained_models/mdm-smpl_clip_smplrifke_humanml3d/logs/checkpoints/last.ckpt", map_location="cuda")
+    # diffusion_rl.load_state_dict(ckpt["state_dict"])
 
     diffusion_rl = diffusion_rl.to(device)
 
-    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) +"val")
-    test_dataset = instantiate(cfg.data, split=str(c.dataset_name) +"test")
+    c.val_num_batch = 0
+
+    val_dataset = instantiate(cfg.data, split="" +"val")
+    test_dataset = instantiate(cfg.data, split="" +"test")
 
     infos = {
         "featsname": cfg.motion_features,
         "fps": c.fps,
-        "guidance_weight":  c.guidance_weight
+        "guidance_weight": 1,
     }
 
     if c.sequence_fixed:
@@ -159,7 +165,7 @@ def main(c: DictConfig):
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=c.val_batch_size,
+        batch_size=32,
         shuffle=False,
         drop_last=False,
         num_workers=c.num_workers,
@@ -170,7 +176,7 @@ def main(c: DictConfig):
 
     test_dataloader = DataLoader(
         test_dataset,
-        batch_size=c.val_batch_size,
+        batch_size=32,
         shuffle=False,
         drop_last=False,
         num_workers=c.num_workers,
@@ -179,17 +185,26 @@ def main(c: DictConfig):
 
     test_embedding_tmr = preload_tmr_text(val_dataloader)
 
-    file_path = "ResultRL/TEST/"
-    os.makedirs(file_path, exist_ok=True)
+    file_path_val = "ResultRL/BB/"
+    os.makedirs(file_path_val, exist_ok=True)
 
-    file_path = "ResultRL/VAL/"
-    os.makedirs(file_path, exist_ok=True)
+    file_path_test = "ResultRL/AA/"
+    os.makedirs(file_path_test, exist_ok=True)
 
-    avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr, path="ResultRL/VAL/OLD/")
-    print("Validation-reward:", avg_reward,"Validation-tmr:", avg_tmr, "Validation-tmr++:", avg_tmr_plus_plus, "Validation-guo:", avg_guo)
+    # avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr, path=file_path_val)
+    # print("Valid-reward:", avg_reward,"Valid-tmr:", avg_tmr, "Valid-tmr++:", avg_tmr_plus_plus, "Valid-guo:", avg_guo)
 
-    avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
-    print("Test-reward:", avg_reward, "Test-tmr:", avg_tmr, "Test-tmr++:", avg_tmr_plus_plus, "Test-guo:", avg_guo)
+    avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, test_embedding_tmr, path=file_path_test)
+    print("Test-reward: ", avg_reward, "Test-tmr: ", avg_tmr, "Test-tmr++: ", avg_tmr_plus_plus, "Test-guo: ", avg_guo)
+
+    infos = {
+        "featsname": cfg.motion_features,
+        "fps": c.fps,
+        "guidance_weight": 5,
+    }
+    print("guidnace 5")
+    avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, test_embedding_tmr, path=file_path_test)
+    print("Test-reward: ", avg_reward, "Test-tmr: ", avg_tmr, "Test-tmr++: ", avg_tmr_plus_plus, "Test-guo: ", avg_guo)
 
     # GT val (short) [tmr:0.897 tmr++: 0.892]
     # GT test (short) [tmr: 0.836 tmr++: 0.837]
