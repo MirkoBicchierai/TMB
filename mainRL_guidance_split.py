@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from RL.reward_model import tmr_reward_special
+from RL.reward_model import all_metrics, reward_model
 from src.tools.smpl_layer import SMPLH
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -71,15 +71,15 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         sequences, results_by_timestep = model.diffusionRL_guidance_split(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond,
                                                                           infos=infos, target_model=target_model)
 
-        metrics = tmr_reward_special(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr,
-                                     c)
+        metrics_reward = reward_model(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, c)
 
-        if torch.isnan(metrics["tmr"].cpu()).any() or torch.isnan(metrics["tmr++"].cpu()).any() or torch.isnan(
+        if torch.isnan(metrics_reward["tmr"].cpu()).any() or torch.isnan(
+                metrics_reward["tmr++"].cpu()).any() or torch.isnan(
                 sequences.cpu()).any():
             print("Found NaN in masked_tmr")
             # Do something if there is at least one NaN
-            masked_tmr_np = metrics["tmr"].cpu().numpy()
-            masked_tmr_plus_np = metrics["tmr++"].cpu().numpy()
+            masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
+            masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
             save_dir = "NaN_folder"
             os.makedirs(save_dir, exist_ok=True)
             # Save to .npy file
@@ -125,19 +125,13 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
             experiment = {k: v.detach().cpu() if isinstance(v, torch.Tensor) else v for k, v in experiment.items()}
 
             if t == 0:
-                all_rewards.append(metrics["reward"].cpu())
-                all_tmr.append(metrics["tmr"].cpu())
-                all_tmr_plus_plus.append(metrics["tmr++"].cpu())
-                all_guo.append(metrics["guo"].cpu())
+                all_rewards.append(metrics_reward["reward"].cpu())
             else:
-                all_rewards.append(torch.zeros_like(metrics["reward"]).cpu())
-                all_tmr.append(torch.zeros_like(metrics["tmr"]).cpu())
-                all_tmr_plus_plus.append(torch.zeros_like(metrics["tmr++"]).cpu())
-                all_guo.append(torch.zeros_like(metrics["guo"]).cpu())
+                all_rewards.append(torch.zeros_like(metrics_reward["reward"]).cpu())
 
             all_xt_new.append(experiment["xt_new"])
             all_xt_old.append(experiment["xt_old"])
-            all_t.append(torch.full((batch_size,), t, device=metrics["reward"].device).cpu())
+            all_t.append(torch.full((batch_size,), t, device=metrics_reward["reward"].device).cpu())
             all_log_probs.append(experiment["log_prob"])
 
             # y
@@ -402,10 +396,11 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
                        out_formats, video_log=True)
 
-            metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)
+            metrics_reward = reward_model(sequences, infos, smplh, batch["text"], c)
+            metrics = all_metrics(sequences, infos, smplh, batch["text"], c)
 
-            total_reward += metrics["reward"].sum().item()
-            batch_count_reward += metrics["reward"].shape[0]
+            total_reward += metrics_reward["reward"].sum().item()
+            batch_count_reward += metrics_reward["reward"].shape[0]
 
             total_tmr += metrics["tmr"].sum().item()
             batch_count_tmr += metrics["tmr"].shape[0]
@@ -511,10 +506,10 @@ def main(c: DictConfig):
         """END LORA"""
 
     # if c.betaL > 0:
-    diffusion_old = instantiate(cfg.diffusion)
-    diffusion_old.load_state_dict(ckpt["state_dict"])
-    diffusion_old = diffusion_old.to(device)
-    diffusion_old.train()
+    # diffusion_old = instantiate(cfg.diffusion)
+    # diffusion_old.load_state_dict(ckpt["state_dict"])
+    # diffusion_old = diffusion_old.to(device)
+    # diffusion_old.train()
     # else:
     #     diffusion_old = None
 
@@ -579,7 +574,7 @@ def main(c: DictConfig):
 
     avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model,
                                                            smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr,
-                                                           path="../ResultRL/VAL/OLD/", target_model=diffusion_old)
+                                                           path="../ResultRL/VAL/OLD/", target_model=diffusion_rl)
     wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                               "iterations": 0}})
 
@@ -587,14 +582,14 @@ def main(c: DictConfig):
     for iteration in iter_bar:
 
         train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh,
-                                     train_embedding_tmr, diffusion_old)  # , generation_iter
-        train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_old)
+                                     train_embedding_tmr, diffusion_rl)  # , generation_iter
+        train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_rl)
 
         if (iteration + 1) % c.val_iter == 0:
             avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos,
                                                                    text_model, smplh, joints_renderer,
                                                                    smpl_renderer, c, val_embedding_tmr,
-                                                                   path="ResultRL/VAL/" + str(iteration + 1) + "/", target_model=diffusion_old)
+                                                                   path="ResultRL/VAL/" + str(iteration + 1) + "/", target_model=diffusion_rl)
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                                       "iterations": iteration + 1}})
             torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
