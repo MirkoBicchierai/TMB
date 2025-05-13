@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from RL.reward_model import all_metrics, reward_model
+from RL.reward_model import tmr_reward_special
 from src.tools.smpl_layer import SMPLH
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -29,7 +29,7 @@ def preload_tmr_text(dataloader):
 
 @torch.no_grad()
 def generate(model, train_dataloader, iteration, c, device, infos, text_model, smplh,
-             train_embedding_tmr):  # , generation_iter
+             train_embedding_tmr, target_model):  # , generation_iter
     model.train()
 
     dataset = {
@@ -40,6 +40,10 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         "t": [],
         "log_like": [],
 
+        "tmr": [],
+        "tmr++": [],
+        "guo": [],
+
         "mask": [],
         "length": [],
         "tx_x": [],
@@ -48,6 +52,7 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         "tx_uncond_x": [],
         "tx_uncond_mask": [],
         "tx_uncond_length": [],
+        "tx_uncond_output": [],
 
     }
 
@@ -63,16 +68,18 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         if not c.sequence_fixed:
             infos["all_lengths"] = batch["length"].repeat(c.num_gen_per_prompt)
 
-        sequences, results_by_timestep = model.diffusionRL(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond, infos=infos)
+        sequences, results_by_timestep = model.diffusionRL_guidance_split(tx_emb=tx_emb, tx_emb_uncond=tx_emb_uncond,
+                                                                          infos=infos, target_model=target_model)
 
-        metrics_reward = reward_model(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, c)
+        metrics = tmr_reward_special(sequences, infos, smplh, batch["text"] * c.num_gen_per_prompt, train_embedding_tmr,
+                                     c)
 
-        if torch.isnan(metrics_reward["tmr"].cpu()).any() or torch.isnan(metrics_reward["tmr++"].cpu()).any() or torch.isnan(
+        if torch.isnan(metrics["tmr"].cpu()).any() or torch.isnan(metrics["tmr++"].cpu()).any() or torch.isnan(
                 sequences.cpu()).any():
             print("Found NaN in masked_tmr")
             # Do something if there is at least one NaN
-            masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
-            masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
+            masked_tmr_np = metrics["tmr"].cpu().numpy()
+            masked_tmr_plus_np = metrics["tmr++"].cpu().numpy()
             save_dir = "NaN_folder"
             os.makedirs(save_dir, exist_ok=True)
             # Save to .npy file
@@ -111,19 +118,26 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         all_tx_uncond_x = []
         all_tx_uncond_length = []
         all_tx_uncond_mask = []
+        all_tx_uncond_output = []
 
         for t in timesteps:
             experiment = results_by_timestep[t]
             experiment = {k: v.detach().cpu() if isinstance(v, torch.Tensor) else v for k, v in experiment.items()}
 
             if t == 0:
-                all_rewards.append(metrics_reward["reward"].cpu())
+                all_rewards.append(metrics["reward"].cpu())
+                all_tmr.append(metrics["tmr"].cpu())
+                all_tmr_plus_plus.append(metrics["tmr++"].cpu())
+                all_guo.append(metrics["guo"].cpu())
             else:
-                all_rewards.append(torch.zeros_like(metrics_reward["reward"]).cpu())
+                all_rewards.append(torch.zeros_like(metrics["reward"]).cpu())
+                all_tmr.append(torch.zeros_like(metrics["tmr"]).cpu())
+                all_tmr_plus_plus.append(torch.zeros_like(metrics["tmr++"]).cpu())
+                all_guo.append(torch.zeros_like(metrics["guo"]).cpu())
 
             all_xt_new.append(experiment["xt_new"])
             all_xt_old.append(experiment["xt_old"])
-            all_t.append(torch.full((batch_size,), t, device=metrics_reward["reward"].device).cpu())
+            all_t.append(torch.full((batch_size,), t, device=metrics["reward"].device).cpu())
             all_log_probs.append(experiment["log_prob"])
 
             # y
@@ -135,9 +149,13 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
             all_tx_uncond_x.append(experiment["tx_uncond-x"])
             all_tx_uncond_length.append(experiment["tx_uncond-length"])
             all_tx_uncond_mask.append(experiment["tx_uncond-mask"])
+            all_tx_uncond_output.append(experiment["tx_uncond-output"])
 
         # Concatenate all the results for this batch
         dataset["r"].append(torch.cat(all_rewards, dim=0).view(diff_step, batch_size).T.clone())
+        dataset["tmr"].append(torch.cat(all_tmr, dim=0).view(diff_step, batch_size).T.clone())
+        dataset["tmr++"].append(torch.cat(all_tmr_plus_plus, dim=0).view(diff_step, batch_size).T.clone())
+        dataset["guo"].append(torch.cat(all_guo, dim=0).view(diff_step, batch_size).T.clone())
         dataset["xt_1"].append(
             torch.cat(all_xt_new, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
         dataset["xt"].append(
@@ -156,6 +174,8 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         dataset["tx_uncond_length"].append(torch.cat(all_tx_uncond_length, dim=0).view(diff_step, batch_size).T)
         dataset["tx_uncond_mask"].append(
             torch.cat(all_tx_uncond_mask, dim=0).view(diff_step, batch_size, 1).permute(1, 0, 2))
+        dataset["tx_uncond_output"].append(
+            torch.cat(all_tx_uncond_output, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
 
     for key in dataset:
         dataset[key] = torch.cat(dataset[key], dim=0)
@@ -198,8 +218,9 @@ def get_batch(dataset, i, minibatch_size, infos, diff_step, device):
     xt = dataset["xt"][i: i + minibatch_size].to(device)
     t = dataset["t"][i: i + minibatch_size].to(device)
     log_like = dataset["log_like"][i: i + minibatch_size].to(device)
+    output_uncond = dataset["tx_uncond_output"][i: i + minibatch_size].to(device)
 
-    return y, r, xt_1, xt, t, log_like
+    return y, r, xt_1, xt, t, log_like, output_uncond
 
 
 def prepare_dataset(dataset):
@@ -219,7 +240,19 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
     mean_r = torch.mean(dataset["r"][mask], dim=0)
     std_r = torch.std(dataset["r"][mask], dim=0)
 
-    wandb.log({"Train": {"Mean Reward": mean_r.item(), "Std Reward": std_r.item(), "iterations": iteration}})
+    mean_tmr = torch.mean(dataset["tmr"][mask], dim=0)
+    std_tmr = torch.std(dataset["tmr"][mask], dim=0)
+
+    mean_tmr_plus_plus = torch.mean(dataset["tmr++"][mask], dim=0)
+    std_tmr_plus_plus = torch.std(dataset["tmr++"][mask], dim=0)
+
+    mean_guo = torch.mean(dataset["guo"][mask], dim=0)
+    std_guo = torch.std(dataset["guo"][mask], dim=0)
+
+    wandb.log({"Train": {"Mean Reward": mean_r.item(), "Std Reward": std_r.item(), "Mean TMR": mean_tmr.item(),
+                         "Std TMR": std_tmr.item(), "Mean TMR++": mean_tmr_plus_plus.item(),
+                         "Std TMR++": std_tmr_plus_plus.item(), "Std Guo": std_guo, "Mean Guo": mean_guo,
+                         "iterations": iteration}})
 
     dataset["advantage"] = torch.zeros_like(dataset["r"])
     dataset["advantage"][mask] = (dataset["r"][mask] - mean_r) / (std_r + delta)
@@ -246,11 +279,14 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
             # with torch.autocast(device_type="cuda"):
             advantage = dataset["advantage"][batch_idx: batch_idx + c.train_batch_size].to(device)
             real_batch_size = advantage.shape[0]
-            y, r, xt_1, xt, t, log_like = get_batch(dataset, batch_idx, real_batch_size, infos, diff_step, device)
+            y, r, xt_1, xt, t, log_like, output_uncond = get_batch(dataset, batch_idx, real_batch_size, infos,
+                                                                   diff_step, device)
 
-            new_log_like, rl_pred = model.diffusionRL(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
+            new_log_like, rl_pred = model.diffusionRL_guidance_split(y=y, infos=infos, t=t.view(diff_step * real_batch_size),
                                                       xt=xt.view(diff_step * real_batch_size, *xt.shape[2:]),
-                                                      A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]))
+                                                      A=xt_1.view(diff_step * real_batch_size, *xt_1.shape[2:]),
+                                                      output_uncond=output_uncond.view(diff_step * real_batch_size,
+                                                                                       *output_uncond.shape[2:]))
 
             new_log_like = new_log_like.view(real_batch_size, diff_step)
             rl_pred = rl_pred.view(real_batch_size, diff_step, *rl_pred.shape[1:])
@@ -323,7 +359,7 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
 
 
 def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, smpl_renderer, c, all_embedding_tmr,
-         path):
+         path, target_model):
     os.makedirs(path, exist_ok=True)
     out_formats = ['txt', 'smpl', 'joints', 'videojoints']
 
@@ -356,17 +392,20 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
             if not c.sequence_fixed:
                 infos["all_lengths"] = batch["length"]
 
-            sequences, _ = model.diffusionRL(tx_emb, tx_emb_uncond, infos)
+            sequences, _ = model.diffusionRL_guidance_split(tx_emb=tx_emb,
+                                                                              tx_emb_uncond=tx_emb_uncond,
+                                                                              infos=infos, target_model=target_model)
+
+
 
             if ((ty_log == "Validation" and batch_idx == 0) or ty_log == "Test") and c.render_videos:
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
                        out_formats, video_log=True)
 
-            metrics_reward = reward_model(sequences, infos, smplh, batch["text"], c)
-            metrics = all_metrics(sequences, infos, smplh, batch["text"], c)
+            metrics = tmr_reward_special(sequences, infos, smplh, batch["text"], all_embedding_tmr, c)
 
-            total_reward += metrics_reward["reward"].sum().item()
-            batch_count_reward += metrics_reward["reward"].shape[0]
+            total_reward += metrics["reward"].sum().item()
+            batch_count_reward += metrics["reward"].shape[0]
 
             total_tmr += metrics["tmr"].sum().item()
             batch_count_tmr += metrics["tmr"].shape[0]
@@ -471,17 +510,19 @@ def main(c: DictConfig):
 
         """END LORA"""
 
-    if c.betaL > 0:
-        diffusion_old = instantiate(cfg.diffusion)
-        diffusion_old.load_state_dict(ckpt["state_dict"])
-        diffusion_old = diffusion_old.to(device)
-        diffusion_old.eval()
-    else:
-        diffusion_old = None
+    # if c.betaL > 0:
+    diffusion_old = instantiate(cfg.diffusion)
+    diffusion_old.load_state_dict(ckpt["state_dict"])
+    diffusion_old = diffusion_old.to(device)
+    diffusion_old.train()
+    # else:
+    #     diffusion_old = None
 
-    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val") # + "train"
-    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test") # + "val"
-    #test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
+
+
+    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
+    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
+    # test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
 
     infos = {
         "featsname": cfg.motion_features,
@@ -514,16 +555,16 @@ def main(c: DictConfig):
 
     val_embedding_tmr = preload_tmr_text(val_dataloader)
 
-    #test_dataloader = DataLoader(
+    # test_dataloader = DataLoader(
     #    test_dataset,
     #    batch_size=c.val_batch_size,
     #    shuffle=False,
     #    drop_last=False,
     #    num_workers=c.num_workers,
     #    collate_fn=test_dataset.collate_fn
-    #)
+    # )
 
-    #test_embedding_tmr = preload_tmr_text(val_dataloader)
+    # test_embedding_tmr = preload_tmr_text(val_dataloader)
 
     file_path = "../ResultRL/VAL/"
     os.makedirs(file_path, exist_ok=True)
@@ -538,7 +579,7 @@ def main(c: DictConfig):
 
     avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model,
                                                            smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr,
-                                                           path="../ResultRL/VAL/OLD/")
+                                                           path="../ResultRL/VAL/OLD/", target_model=diffusion_old)
     wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                               "iterations": 0}})
 
@@ -546,25 +587,23 @@ def main(c: DictConfig):
     for iteration in iter_bar:
 
         train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh,
-                                     train_embedding_tmr)  # , generation_iter
+                                     train_embedding_tmr, diffusion_old)  # , generation_iter
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_old)
 
         if (iteration + 1) % c.val_iter == 0:
             avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos,
                                                                    text_model, smplh, joints_renderer,
                                                                    smpl_renderer, c, val_embedding_tmr,
-                                                                   path="ResultRL/VAL/" + str(iteration + 1) + "/")
+                                                                   path="ResultRL/VAL/" + str(iteration + 1) + "/", target_model=diffusion_old)
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                                       "iterations": iteration + 1}})
             torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
             iter_bar.set_postfix(val_tmr=f"{avg_tmr:.4f}")
 
-    #file_path = "ResultRL/TEST/"
-    #os.makedirs(file_path, exist_ok=True)
-    #avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model,
-    #                                                       smplh, joints_renderer,
-    #                                                       smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
-    #wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo}})
+    # file_path = "ResultRL/TEST/"
+    # os.makedirs(file_path, exist_ok=True)
+    # avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model,smplh, joints_renderer, smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
+    # wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo}})
 
     torch.save(diffusion_rl.state_dict(), 'RL_Model/model_final.pth')
 

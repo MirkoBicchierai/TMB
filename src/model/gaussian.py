@@ -261,6 +261,24 @@ class GaussianDiffusion(DiffuserBase):
         xstart = output
         return x_out, xstart
 
+    def p_sample_split(self, xt, y, t, guidance_weight,output_uncond ):
+        output_cond = masked(self.denoiser(xt, y, t), y["mask"])
+
+        if guidance_weight == 1.0:
+            output = output_cond
+        else:
+
+            output = output_uncond + guidance_weight * (output_cond - output_uncond)
+
+        mean, sigma = self.q_posterior_distribution_from_output_and_xt(output, xt, t)
+        mean = masked(mean, y["mask"])
+        sigma = torch.max(sigma, torch.tensor(0.1, device=sigma.device))
+
+        noise = torch.randn_like(mean)
+        x_out = mean + sigma * noise
+        xstart = output
+        return x_out, xstart, mean, sigma
+
     def p_sample_2(self, xt, y, t, guidance_weight):
         output_cond = masked(self.denoiser(xt, y, t), y["mask"])
 
@@ -463,6 +481,94 @@ class GaussianDiffusion(DiffuserBase):
         else:
 
             xt_pred, _, mean, sigma = self.p_sample_2(xt, y, t, infos["guidance_weight"])
+            xt_pred = masked(xt_pred, y["mask"])
+            log_likelihood = self.log_likelihood(A, mean, sigma)
+            log_likelihood = nan_masked(log_likelihood, y["mask"])
+            log_probs = log_likelihood.nanmean(dim=[1, 2])
+
+            return log_probs, xt_pred
+
+    def diffusionRL_guidance_split(self,tx_emb=None, tx_emb_uncond=None, infos=None, y=None, t=None, xt=None,A=None, target_model=None, output_uncond=None):
+
+        device = self.device
+
+        if A is None:
+
+            lengths = infos["all_lengths"][0:tx_emb["x"].shape[0]]
+            mask = length_to_mask(lengths, device=device)
+
+            y = {
+                "length": lengths,
+                "mask": mask,
+                "tx": self.prepare_tx_emb(tx_emb),
+                "tx_uncond": self.prepare_tx_emb(tx_emb_uncond),
+                "infos": infos,
+            }
+
+            bs = len(lengths)
+            duration = max(lengths)
+
+            if isinstance(duration, torch.Tensor):
+                duration = int(duration.item())
+
+            nfeats = self.denoiser.nfeats
+
+            shape = bs, duration, nfeats
+
+            xt = masked(torch.randn(shape, device=device), mask)
+
+            # iterator = range(self.timesteps - 1, -1, -1)
+
+            iterator = list(range(self.timesteps - 1, -1, -2)) + [0]
+
+            results = {}
+
+            for diffusion_step in iterator:
+                t = torch.full((bs,), diffusion_step, device=device)
+                xt_old = xt.clone()
+
+                y_uncond = y.copy()
+                y_uncond["tx"] = y_uncond["tx_uncond"]
+                output_uncond = masked(target_model.denoiser(xt, y_uncond, t), y["mask"])
+
+                xt, x_start, mean, sigma = self.p_sample_split(xt, y, t, infos["guidance_weight"], output_uncond)
+
+                x_start = masked(x_start, mask)
+                xt = masked(xt, mask)
+
+                log_likelihood = self.log_likelihood(xt, mean, sigma)
+                log_likelihood = nan_masked(log_likelihood, mask)
+                log_prob = log_likelihood.nanmean(dim=[1, 2])
+
+                results[diffusion_step] = {
+
+                    "t": diffusion_step,  # begin the t
+                    "xt_old": xt_old.detach().cpu(),  # begin the xt
+                    "xt_new": xt.clone().detach().cpu(),  # begin the A when train PPO
+                    "log_prob": log_prob.detach().cpu(),
+
+                    "length": lengths.detach().cpu(),
+                    "mask": mask.detach().cpu(),
+                    "tx-x": y["tx"]["x"],
+                    "tx-length": y["tx"]["length"],
+                    "tx-mask": y["tx"]["mask"],
+
+                    "tx_uncond-x": y["tx_uncond"]["x"],
+                    "tx_uncond-length": y["tx_uncond"]["length"],
+                    "tx_uncond-mask": y["tx_uncond"]["mask"],
+                    "tx_uncond-output": output_uncond.detach().cpu(),
+
+                }
+
+                results = {k: v.detach().to("cpu") if isinstance(v, torch.Tensor) else v for k, v in results.items()}
+
+            x_start = self.motion_normalizer.inverse(x_start)
+
+            return x_start, results
+
+        else:
+
+            xt_pred, _, mean, sigma = self.p_sample_split(xt, y, t, infos["guidance_weight"], output_uncond)
             xt_pred = masked(xt_pred, y["mask"])
             log_likelihood = self.log_likelihood(A, mean, sigma)
             log_likelihood = nan_masked(log_likelihood, y["mask"])
