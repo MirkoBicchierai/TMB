@@ -48,7 +48,6 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         "tx_uncond_x": [],
         "tx_uncond_mask": [],
         "tx_uncond_length": [],
-
     }
 
     generate_bar = tqdm(enumerate(itertools.islice(itertools.cycle(train_dataloader), 1)),
@@ -299,9 +298,9 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
             tot_policy_loss += policy_loss.item()
 
             mb_counter += 1
-
             if mb_counter == 4:
                 mb_counter = 0
+
                 grad_norm = torch.sqrt(sum(p.grad.norm() ** 2 for p in model.parameters() if p.grad is not None))
                 wandb.log({"Train": {"Gradient Norm": grad_norm.item(),
                                      "real_step": (iteration * c.train_epochs + e) * num_minibatches + (
@@ -357,6 +356,7 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
         os.makedirs(tmp_path, exist_ok=True)
 
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             tx_emb, tx_emb_uncond = get_embeddings(text_model, batch, device)
 
@@ -369,11 +369,11 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
                 render(sequences, infos, smplh, joints_renderer, smpl_renderer, batch["text"], tmp_path, ty_log,
                        out_formats, video_log=True)
 
-            metrics_reward = reward_model(sequences, infos, smplh, batch["text"], c)
+            #metrics_reward = reward_model(sequences, infos, smplh, batch["text"], c)
             metrics = all_metrics(sequences, infos, smplh, batch["text"], c)
 
             has_nan = (
-                    any(torch.isnan(t.cpu()).any() for t in metrics_reward.values())
+                    any(torch.isnan(t.cpu()).any() for t in metrics.values())
                     or torch.isnan(sequences.cpu()).any()
             )
 
@@ -383,11 +383,11 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
                 os.makedirs(save_dir, exist_ok=True)
                 # Do something if there is at least one NaN
                 try:
-                    masked_tmr_np = metrics_reward["tmr"].cpu().numpy()
+                    masked_tmr_np = metrics["tmr"].cpu().numpy()
                     np.save(os.path.join(save_dir, "masked_tmr_with_nan.npy"), masked_tmr_np)
 
                 except:
-                    masked_tmr_plus_np = metrics_reward["tmr++"].cpu().numpy()
+                    masked_tmr_plus_np = metrics["tmr++"].cpu().numpy()
                     np.save(os.path.join(save_dir, "masked_tmr_plus_with_nan.npy"), masked_tmr_plus_np)
                 # Save to .npy file
                 np.save(os.path.join(save_dir, "sequences.npy"), sequences.cpu().numpy())
@@ -396,8 +396,8 @@ def test(model, dataloader, device, infos, text_model, smplh, joints_renderer, s
                     infos["all_lengths"] = infos["all_lengths"].tolist()
                     json.dump(infos, f, indent=4)
 
-            total_reward += metrics_reward["reward"].sum().item()
-            batch_count_reward += metrics_reward["reward"].shape[0]
+            total_reward += metrics["reward"].sum().item()
+            batch_count_reward += metrics["reward"].shape[0]
 
             total_tmr += metrics["tmr"].sum().item()
             batch_count_tmr += metrics["tmr"].shape[0]
@@ -510,9 +510,9 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
-    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val") # + "train"
-    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test") # + "val"
-    #test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
+    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "train")
+    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
+    test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
 
     infos = {
         "featsname": cfg.motion_features,
@@ -545,16 +545,16 @@ def main(c: DictConfig):
 
     val_embedding_tmr = preload_tmr_text(val_dataloader)
 
-    #test_dataloader = DataLoader(
-    #    test_dataset,
-    #    batch_size=c.val_batch_size,
-    #    shuffle=False,
-    #    drop_last=False,
-    #    num_workers=c.num_workers,
-    #    collate_fn=test_dataset.collate_fn
-    #)
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=c.val_batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=c.num_workers,
+        collate_fn=test_dataset.collate_fn
+    )
 
-    #test_embedding_tmr = preload_tmr_text(val_dataloader)
+    test_embedding_tmr = preload_tmr_text(val_dataloader)
 
     file_path = "../ResultRL/VAL/"
     os.makedirs(file_path, exist_ok=True)
@@ -576,7 +576,7 @@ def main(c: DictConfig):
     iter_bar = tqdm(range(c.iterations), desc="Iterations", total=c.iterations)
     for iteration in iter_bar:
 
-        train_datasets_rl = generate(diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh,
+        train_datasets_rl = generate( diffusion_rl, train_dataloader, iteration, c, device, infos, text_model, smplh,
                                      train_embedding_tmr)  # , generation_iter
         train(diffusion_rl, optimizer, train_datasets_rl, iteration, c, infos, device, old_model=diffusion_old)
 
@@ -590,12 +590,12 @@ def main(c: DictConfig):
             torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
             iter_bar.set_postfix(val_tmr=f"{avg_tmr:.4f}")
 
-    #file_path = "ResultRL/TEST/"
-    #os.makedirs(file_path, exist_ok=True)
-    #avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model,
-    #                                                       smplh, joints_renderer,
-    #                                                       smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
-    #wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo}})
+    file_path = "ResultRL/TEST/"
+    os.makedirs(file_path, exist_ok=True)
+    avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model,
+                                                           smplh, joints_renderer,
+                                                           smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
+    wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo}})
 
     torch.save(diffusion_rl.state_dict(), 'RL_Model/model_final.pth')
 

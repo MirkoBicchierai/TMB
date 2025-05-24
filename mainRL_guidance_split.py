@@ -40,10 +40,6 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         "t": [],
         "log_like": [],
 
-        "tmr": [],
-        "tmr++": [],
-        "guo": [],
-
         "mask": [],
         "length": [],
         "tx_x": [],
@@ -153,9 +149,6 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
 
         # Concatenate all the results for this batch
         dataset["r"].append(torch.cat(all_rewards, dim=0).view(diff_step, batch_size).T.clone())
-        dataset["tmr"].append(torch.cat(all_tmr, dim=0).view(diff_step, batch_size).T.clone())
-        dataset["tmr++"].append(torch.cat(all_tmr_plus_plus, dim=0).view(diff_step, batch_size).T.clone())
-        dataset["guo"].append(torch.cat(all_guo, dim=0).view(diff_step, batch_size).T.clone())
         dataset["xt_1"].append(
             torch.cat(all_xt_new, dim=0).view(diff_step, batch_size, seq_len, 205).permute(1, 0, 2, 3))
         dataset["xt"].append(
@@ -181,6 +174,8 @@ def generate(model, train_dataloader, iteration, c, device, infos, text_model, s
         dataset[key] = torch.cat(dataset[key], dim=0)
 
     return dataset
+
+
 
 
 def get_batch(dataset, i, minibatch_size, infos, diff_step, device):
@@ -240,19 +235,7 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
     mean_r = torch.mean(dataset["r"][mask], dim=0)
     std_r = torch.std(dataset["r"][mask], dim=0)
 
-    mean_tmr = torch.mean(dataset["tmr"][mask], dim=0)
-    std_tmr = torch.std(dataset["tmr"][mask], dim=0)
-
-    mean_tmr_plus_plus = torch.mean(dataset["tmr++"][mask], dim=0)
-    std_tmr_plus_plus = torch.std(dataset["tmr++"][mask], dim=0)
-
-    mean_guo = torch.mean(dataset["guo"][mask], dim=0)
-    std_guo = torch.std(dataset["guo"][mask], dim=0)
-
-    wandb.log({"Train": {"Mean Reward": mean_r.item(), "Std Reward": std_r.item(), "Mean TMR": mean_tmr.item(),
-                         "Std TMR": std_tmr.item(), "Mean TMR++": mean_tmr_plus_plus.item(),
-                         "Std TMR++": std_tmr_plus_plus.item(), "Std Guo": std_guo, "Mean Guo": mean_guo,
-                         "iterations": iteration}})
+    wandb.log({"Train": {"Mean Reward": mean_r.item(), "Std Reward": std_r.item(), "iterations": iteration}})
 
     dataset["advantage"] = torch.zeros_like(dataset["r"])
     dataset["advantage"][mask] = (dataset["r"][mask] - mean_r) / (std_r + delta)
@@ -350,7 +333,7 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
 
         if c.betaL > 0:
             epoch_kl = tot_kl / num_minibatches
-            wandb.log({"Train": {"loss": epoch_loss, "epochs": iteration * c.train_epochs + e,
+            wandb.log({"Train": {"gloss": epoch_loss, "epochs": iteration * c.train_epochs + e,
                                  "policy_loss": epoch_policy_loss, "kl_loss": epoch_kl,
                                  "trigger-clip": clipping_percentage}})
         else:

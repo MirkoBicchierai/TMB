@@ -143,7 +143,7 @@ def reward_model(sequences, infos, smplh, real_texts, c):
         }
 
     if c.reward == "TMR++":
-        tmr_plus_plus, reward = tmr_metrics(motions_guofeats,real_texts, c)
+        tmr_plus_plus, reward = tmr_plus_plus_metrics(motions_guofeats,real_texts, c)
         metrics = {
             "tmr++": tmr_plus_plus,
             "reward" : reward
@@ -162,14 +162,24 @@ def all_metrics(sequences, infos, smplh, real_texts, c):
 
     motions_guofeats = get_motion_guofeats(sequences, infos, smplh)
 
-    guo_et_al, _  = guo_metrics(motions_guofeats, real_texts, c)
-    tmr_plus_plus, _ = tmr_metrics(motions_guofeats, real_texts, c)
-    tmr, _ = tmr_metrics(motions_guofeats, real_texts, c)
+    guo_et_al, guo_reward  = guo_metrics(motions_guofeats, real_texts, c)
+    tmr_plus_plus, tmr_plus_plus_reward = tmr_plus_plus_metrics(motions_guofeats, real_texts, c)
+    tmr, tmr_reward = tmr_metrics(motions_guofeats, real_texts, c)
+
+    reward = None
+
+    if c.reward == "TMR":
+        reward = tmr_reward
+    if c.reward == "TMR++":
+        reward = tmr_plus_plus_reward
+    if c.reward == "GUO":
+        reward = guo_reward
 
     metrics = {
         "tmr": tmr,
         "tmr++": tmr_plus_plus,
         "guo": guo_et_al,
+        "reward": reward,
     }
 
     return metrics

@@ -50,7 +50,7 @@ grad_clip: 1.0
 advantage_clip_epsilon: 1e-4
 
 # Reward Model
-reward: "TMR"
+reward: "TMR++"
 
 masking_ratio: 0.75
 reward_scale: 10
@@ -94,6 +94,4 @@ lora_bias: "none"
 experiment_name: 'New_'
 group_name: ''
 
-
-tmr_plus_plus: true
 
