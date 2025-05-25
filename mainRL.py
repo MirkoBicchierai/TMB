@@ -429,7 +429,7 @@ def main(c: DictConfig):
     )
 
     create_folder_results("ResultRL")
-    device = "cuda:1" if torch.cuda.is_available() else "cpu"
+    device = c.device_swag if torch.cuda.is_available() else "cpu"
 
     cfg = read_config(c.run_dir)
 
