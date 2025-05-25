@@ -559,8 +559,8 @@ def main(c: DictConfig):
     path_model = c.path_model
     path_res = c.path_res
 
-    os.makedirs("../"+ path_model + "/", exist_ok=True)
-    os.makedirs("../"+path_res + "/", exist_ok=True)
+    create_folder_results(path_model)
+    create_folder_results(path_res)
 
     file_path = "../"+path_res+"/VAL/"
     os.makedirs(file_path, exist_ok=True)
