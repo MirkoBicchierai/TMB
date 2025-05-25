@@ -94,4 +94,6 @@ lora_bias: "none"
 experiment_name: 'New_'
 group_name: ''
 
-
+path_model: "RL_Model_2-5_Val"
+path_res: "ResultRL_2-5_Val"
+train_split: "val"

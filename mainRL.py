@@ -298,7 +298,7 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
             tot_policy_loss += policy_loss.item()
 
             mb_counter += 1
-            if mb_counter == 4:
+            if mb_counter == 2:
                 mb_counter = 0
 
                 grad_norm = torch.sqrt(sum(p.grad.norm() ** 2 for p in model.parameters() if p.grad is not None))
@@ -429,7 +429,7 @@ def main(c: DictConfig):
     )
 
     create_folder_results("ResultRL")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
     cfg = read_config(c.run_dir)
 
@@ -510,8 +510,8 @@ def main(c: DictConfig):
     else:
         diffusion_old = None
 
-    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "train")
-    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "val")
+    train_dataset = instantiate(cfg.data, split=str(c.dataset_name) + c.train_split)
+    val_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
     test_dataset = instantiate(cfg.data, split=str(c.dataset_name) + "test")
 
     infos = {
@@ -556,7 +556,13 @@ def main(c: DictConfig):
 
     test_embedding_tmr = preload_tmr_text(val_dataloader)
 
-    file_path = "../ResultRL/VAL/"
+    path_model = c.path_model
+    path_res = c.path_res
+
+    os.makedirs("../"+ path_model + "/", exist_ok=True)
+    os.makedirs("../"+path_res + "/", exist_ok=True)
+
+    file_path = "../"+path_res+"/VAL/"
     os.makedirs(file_path, exist_ok=True)
 
     if c.lora:
@@ -569,7 +575,7 @@ def main(c: DictConfig):
 
     avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos, text_model,
                                                            smplh, joints_renderer, smpl_renderer, c, val_embedding_tmr,
-                                                           path="../ResultRL/VAL/OLD/")
+                                                           path="../"+path_res+"/VAL/OLD/")
     wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                               "iterations": 0}})
 
@@ -584,20 +590,20 @@ def main(c: DictConfig):
             avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, val_dataloader, device, infos,
                                                                    text_model, smplh, joints_renderer,
                                                                    smpl_renderer, c, val_embedding_tmr,
-                                                                   path="ResultRL/VAL/" + str(iteration + 1) + "/")
+                                                                   path=path_res + "/VAL/" + str(iteration + 1) + "/")
             wandb.log({"Validation": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo,
                                       "iterations": iteration + 1}})
-            torch.save(diffusion_rl.state_dict(), 'RL_Model/checkpoint_' + str(iteration + 1) + '.pth')
+            torch.save(diffusion_rl.state_dict(), path_model + '/checkpoint_' + str(iteration + 1) + '.pth')
             iter_bar.set_postfix(val_tmr=f"{avg_tmr:.4f}")
 
-    file_path = "ResultRL/TEST/"
+    file_path = path_res + "/TEST/"
     os.makedirs(file_path, exist_ok=True)
     avg_reward, avg_tmr, avg_tmr_plus_plus, avg_guo = test(diffusion_rl, test_dataloader, device, infos, text_model,
                                                            smplh, joints_renderer,
-                                                           smpl_renderer, c, test_embedding_tmr, path="ResultRL/TEST/")
+                                                           smpl_renderer, c, test_embedding_tmr, path=path_res + "/TEST/") # TODO test_dataset
     wandb.log({"Test": {"Reward": avg_reward, "TMR": avg_tmr, "TMR++": avg_tmr_plus_plus, "Guo": avg_guo}})
 
-    torch.save(diffusion_rl.state_dict(), 'RL_Model/model_final.pth')
+    torch.save(diffusion_rl.state_dict(), path_model + '/model_final.pth')
 
 
 if __name__ == "__main__":
