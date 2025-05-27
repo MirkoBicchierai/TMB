@@ -13,4 +13,4 @@ seed: 1234
 logger_level: INFO
 device: cuda
 text_features: ${hydra:runtime.choices.text_encoder}
-dataset: humanml3d
+dataset: kitml

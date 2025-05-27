@@ -429,7 +429,7 @@ def main(c: DictConfig):
     )
 
     create_folder_results("ResultRL")
-    device = c.device_swag if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     cfg = read_config(c.run_dir)
 
@@ -532,7 +532,7 @@ def main(c: DictConfig):
         collate_fn=train_dataset.collate_fn
     )
 
-    train_embedding_tmr = preload_tmr_text(train_dataloader)
+    train_embedding_tmr = None
 
     val_dataloader = DataLoader(
         val_dataset,
@@ -543,8 +543,7 @@ def main(c: DictConfig):
         collate_fn=val_dataset.collate_fn
     )
 
-    val_embedding_tmr = preload_tmr_text(val_dataloader)
-
+    val_embedding_tmr = None
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=c.val_batch_size,
@@ -554,7 +553,7 @@ def main(c: DictConfig):
         collate_fn=test_dataset.collate_fn
     )
 
-    test_embedding_tmr = preload_tmr_text(val_dataloader)
+    test_embedding_tmr = None
 
     path_model = c.path_model
     path_res = c.path_res

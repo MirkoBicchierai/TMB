@@ -39,7 +39,7 @@ value_from: smpl
 
 # General parameters
 num_gen_per_prompt: 4
-num_prompts_dataset: 32
+num_prompts_dataset: 64
 num_workers: 6
 
 # Training parameters
@@ -74,8 +74,8 @@ alphaL: 1
 
 # Validation/Test parameters
 val_iter: 25
-val_batch_size: 16
-val_num_batch: 4
+val_batch_size: 128
+val_num_batch: 0
 render_videos: false
 
 dataset_name: ''
@@ -84,7 +84,7 @@ dataset_name: ''
 freeze_normalization_layers: true
 
 #LorA
-lora: false
+lora: true
 lora_rank: 4
 lora_alpha: 16
 lora_dropout: 0.1

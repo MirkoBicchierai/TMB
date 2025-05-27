@@ -19,7 +19,7 @@ def read_split(path, split):
     return id_list
 
 
-def load_annotations(path, name="annotations_mod.json"):
+def load_annotations(path, name="annotations.json"):
     json_path = os.path.join(path, name)
     with open(json_path, "rb") as ff:
         return orjson.loads(ff.read())
@@ -45,6 +45,7 @@ class TextMotionDataset(Dataset):
             split = split + "_tiny"
 
         path = f"datasets/annotations/{name}"
+
         self.collate_fn = collate_text_motion
         self.split = split
         self.keyids = read_split(path, split)
@@ -61,8 +62,9 @@ class TextMotionDataset(Dataset):
         # filter annotations (min/max)
         # but not for the test set
         # otherwise it is not fair for everyone
-        if "test" not in split: 
-            self.annotations = self.filter_annotations(self.annotations)
+
+        self.annotations = self.filter_annotations(self.annotations) # TODO MMMMMMMMMMMMMM
+
 
         #self.is_training = "train" in split
         self.is_training = False
@@ -98,7 +100,6 @@ class TextMotionDataset(Dataset):
 
         annotation = annotations["annotations"][index]
         text = annotation["text"]
-        tmr_text = np.array(annotation["text_tmr"])
 
         drop_motion_perc = None
         load_transition = False
@@ -122,8 +123,9 @@ class TextMotionDataset(Dataset):
             load_transition=load_transition,
         )
 
-        text_encoded = self.text_encoder(text)
+
         text_uncond_encoded = self.text_encoder("")
+        text_encoded = self.text_encoder(text)
 
         x = motion_x_dict["x"]
         length = motion_x_dict["length"]
@@ -131,7 +133,6 @@ class TextMotionDataset(Dataset):
         output = {
             "x": x,
             "text": text,
-            "tmr_text":tmr_text,
             "tx": text_encoded,
             "tx_uncond": text_uncond_encoded,
             "keyid": keyid,
