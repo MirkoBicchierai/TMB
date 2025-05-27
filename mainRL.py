@@ -298,7 +298,7 @@ def train(model, optimizer, dataset, iteration, c, infos, device, old_model=None
             tot_policy_loss += policy_loss.item()
 
             mb_counter += 1
-            if mb_counter == 2:
+            if mb_counter == c.num_grad_accumulation_steps:
                 mb_counter = 0
 
                 grad_norm = torch.sqrt(sum(p.grad.norm() ** 2 for p in model.parameters() if p.grad is not None))
