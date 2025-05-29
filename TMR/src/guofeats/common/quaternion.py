@@ -316,7 +316,12 @@ def quaternion_to_matrix(quaternions):
         Rotation matrices as tensor of shape (..., 3, 3).
     """
     r, i, j, k = torch.unbind(quaternions, -1)
-    two_s = 2.0 / (quaternions * quaternions).sum(-1)
+    # todo risolviamo a manazza!
+    t = (quaternions * quaternions).sum(-1)
+    t.masked_fill_(t == 0, 1)
+    two_s = 2.0 / t
+
+    # two_s = 2.0 / (quaternions * quaternions).sum(-1)
 
     o = torch.stack(
         (
